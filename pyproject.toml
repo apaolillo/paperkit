@@ -1,0 +1,71 @@
+[project]
+name = "paperkit"
+version = "0.1.0"
+description = "Reusable build toolkit for LaTeX papers"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8",
+    "pythainer",
+]
+
+[project.scripts]
+paperkit = "paperkit.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "black>=25",
+    "isort>=6",
+    "ruff<=0.13.0",
+    "mypy<=1.18.1",
+    "types-click<=7.1.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+    "/.venv*",
+    "/venv*",
+    "/__pycache__",
+    "*.pyc",
+    "/.git",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "C4", "RET", "A", "TID", "ERA", "S"]
+ignore = [
+    "S603",   # subprocess calls — we're a build tool, all inputs are trusted
+    "S607",   # partial executable paths — pdflatex/bibtex/pdffonts are expected on PATH
+    "ERA001", # false positives on section comments like "# [project]"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.13"
+packages = ["paperkit"]
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+strict_equality = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = "pythainer.*"
+ignore_missing_imports = true
