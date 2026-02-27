@@ -233,10 +233,13 @@ def check_unused_bib(config: PaperkitConfig, aux_path: Path | None) -> CheckResu
         return result
 
     # Extract cited keys from .aux
+    # bibtex uses \citation{key1,key2}, biblatex/biber uses \abx@aux@cite{N}{key}
     aux_text = aux_path.read_text(errors="replace")
     cited: set[str] = set()
     for m in re.finditer(r"\\citation\{([^}]+)\}", aux_text):
         cited.update(m.group(1).split(","))
+    for m in re.finditer(r"\\abx@aux@cite\{[^}]*\}\{([^}]+)\}", aux_text):
+        cited.add(m.group(1))
 
     # Extract defined keys from .bib
     bib_text = bib_path.read_text(errors="replace")
