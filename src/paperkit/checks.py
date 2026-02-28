@@ -49,10 +49,16 @@ def check_log_errors(log_path: Path, label: str) -> CheckResult:
     lines = text.splitlines()
 
     errors = sum(1 for line in lines if line.startswith("!"))
+    # Biber uses "> ERROR -" instead of "!"
+    errors += sum(1 for line in lines if "> ERROR -" in line)
     warnings = sum(1 for line in lines if "warning" in line.lower())
+    # Biber uses "> WARN -" instead of "warning"
+    warnings += sum(1 for line in lines if "> WARN -" in line)
     # Subtract false positives
     fp = sum(1 for line in lines if "Providing info/warning/error" in line)
     fp += sum(1 for line in lines if "warning$ --" in line)
+    # Biber summary line "WARNINGS: N" already matched by "warning" above
+    fp += sum(1 for line in lines if re.match(r".*> INFO - WARNINGS: \d+", line))
     warnings = max(0, warnings - fp)
 
     if errors > 0:
