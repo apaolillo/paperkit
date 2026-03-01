@@ -41,27 +41,30 @@ def _get_config(ctx: click.Context) -> PaperkitConfig:
 
 @main.command()
 @click.option("--no-docker", is_flag=True, help="Build on host instead of in Docker")
-@click.option("--shell", is_flag=True, help="Open interactive shell in Docker container")
 @click.pass_context
-def build(ctx: click.Context, no_docker: bool, shell: bool) -> None:
+def build(ctx: click.Context, no_docker: bool) -> None:
     """Build the paper PDF."""
     config = _get_config(ctx)
-
-    verbose = ctx.obj["verbose"]
-
-    if shell:
-        from paperkit.docker import build_image, run_in_docker
-
-        click.echo(_header("\U0001f433 Building Docker image ..."))
-        build_image(config, verbose=verbose)
-        click.echo(_header("\U0001f4bb Opening interactive shell ..."))
-        run_in_docker(config, "bash", interactive=True, verbose=verbose)
-        return
 
     if no_docker:
         _build_host(config)
     else:
-        _build_docker(config, verbose=verbose)
+        _build_docker(config, verbose=ctx.obj["verbose"])
+
+
+@main.command()
+@click.pass_context
+def shell(ctx: click.Context) -> None:
+    """Open an interactive bash shell in the Docker container."""
+    from paperkit.docker import build_image, run_in_docker
+
+    config = _get_config(ctx)
+    verbose = ctx.obj["verbose"]
+
+    click.echo(_header("\U0001f433 Building Docker image ..."))
+    build_image(config, verbose=verbose)
+    click.echo(_header("\U0001f4bb Opening shell (project mounted at /paper) ..."))
+    run_in_docker(config, "bash", interactive=True, verbose=verbose)
 
 
 def _build_host(config: PaperkitConfig) -> None:
