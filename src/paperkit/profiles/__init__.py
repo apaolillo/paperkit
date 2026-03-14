@@ -21,6 +21,8 @@ class BaseProfile:
             "--sort-fields",
             "--trailing-commas",
             "--remove-empty-fields",
+            "--enclosing-braces=title",
+            "--align=13",
         ]
 
     def bibtex_tidy_version(self) -> str:

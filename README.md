@@ -117,9 +117,9 @@ Global options: `--config PATH` (config file), `-v/--verbose` (show Docker comma
 
 ## Profiles
 
-**`base`** — Sensible defaults for any LaTeX paper. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --sort-fields --trailing-commas --remove-empty-fields`.
+**`base`** — Sensible defaults for any LaTeX paper. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
 
-**`acm`** — Extends base with ACM-specific bibtex-tidy formatting (`--align=13 --enclosing-braces=title`).
+**`acm`** — For ACM conferences/journals. Currently identical to base; reserved for future ACM-specific defaults.
 
 ## Docker
 
