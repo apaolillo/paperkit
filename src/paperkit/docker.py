@@ -101,11 +101,18 @@ def build_image(config: PaperkitConfig, verbose: bool = False) -> str:
     )
     builder.space()
 
-    # Base packages (all engines + biber + tools) + profile extras + config extras
+    # Base + profile packages in one layer so the cache is shared across all
+    # paperkit projects regardless of their per-project extra_packages.
     builder.desc("Install TeX Live and dependencies")
-    packages = _BASE_PACKAGES + profile.docker_packages() + config.extra_packages
-    builder.add_packages(packages)
+    builder.add_packages(_BASE_PACKAGES + profile.docker_packages())
     builder.space()
+
+    # Project-specific extras in a separate layer — only this layer is rebuilt
+    # when extra_packages changes between projects.
+    if config.extra_packages:
+        builder.desc("Install project-specific extra packages")
+        builder.add_packages(config.extra_packages)
+        builder.space()
 
     # bibtex-tidy
     if config.checks.bibtex_tidy.enabled:
