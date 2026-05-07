@@ -50,6 +50,7 @@ class PaperkitConfig:
     base_image: str = "ubuntu:25.04"
     image_name: str = "paperkit-builder"
     extra_packages: list[str] = field(default_factory=list)
+    debconf_selections: list[str] = field(default_factory=list)
 
     # [checks]
     checks: ChecksConfig = field(default_factory=ChecksConfig)
@@ -102,7 +103,7 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
 
     # [docker]
     docker = raw.get("docker", {})
-    for key in ("base_image", "image_name", "extra_packages"):
+    for key in ("base_image", "image_name", "extra_packages", "debconf_selections"):
         if key in docker:
             setattr(cfg, key, docker[key])
 

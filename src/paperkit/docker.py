@@ -3,6 +3,7 @@
 import contextlib
 import io
 import os
+import shlex
 import sys
 from collections.abc import Generator
 from pathlib import Path
@@ -101,11 +102,30 @@ def build_image(config: PaperkitConfig, verbose: bool = False) -> str:
     )
     builder.space()
 
+    # Run apt-get / dpkg without interactive prompts. Without this, packages
+    # whose postinst scripts call debconf (e.g. ttf-mscorefonts-installer)
+    # try the Dialog/Readline/Teletype frontends and fail in BuildKit because
+    # there's no TTY.
+    builder.env("DEBIAN_FRONTEND", "noninteractive")
+    builder.space()
+
     # Base + profile packages in one layer so the cache is shared across all
     # paperkit projects regardless of their per-project extra_packages.
     builder.desc("Install TeX Live and dependencies")
     builder.add_packages(_BASE_PACKAGES + profile.docker_packages())
     builder.space()
+
+    # Pre-seed debconf answers (e.g. EULA acceptance) before installing
+    # project extras. Must run before add_packages so the postinst scripts
+    # see the preseeded values.
+    if config.debconf_selections:
+        builder.desc("Pre-seed debconf selections")
+        joined = " && ".join(
+            f"echo {shlex.quote(s)} | debconf-set-selections"
+            for s in config.debconf_selections
+        )
+        builder.run(joined)
+        builder.space()
 
     # Project-specific extras in a separate layer — only this layer is rebuilt
     # when extra_packages changes between projects.
