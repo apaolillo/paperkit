@@ -27,15 +27,16 @@ class CheckResult:
 
 
 def _collect_tex_files(config: PaperkitConfig) -> list[Path]:
-    """Collect all .tex files from content_dirs + main .tex."""
+    """Collect all .tex files from content_dirs + every main .tex."""
     files: list[Path] = []
     for d in config.content_dirs:
         tex_dir = config.root / d
         if tex_dir.is_dir():
             files.extend(sorted(tex_dir.glob("*.tex")))
-    main_tex = config.root / f"{config.main}.tex"
-    if main_tex.is_file():
-        files.append(main_tex)
+    for main in config.mains or [config.main]:
+        main_tex = config.root / f"{main}.tex"
+        if main_tex.is_file():
+            files.append(main_tex)
     return files
 
 

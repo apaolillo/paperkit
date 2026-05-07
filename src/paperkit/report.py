@@ -140,3 +140,62 @@ def _worst_status(results: list[CheckResult]) -> CheckStatus:
     if any(cr.status == CheckStatus.WARNING for cr in results):
         return CheckStatus.WARNING
     return CheckStatus.CLEAN
+
+
+def print_multi_summary(
+    runs: list[tuple[str, BuildResult, list[CheckResult]]],
+) -> None:
+    """Print a one-line-per-main summary across all builds."""
+    print(_styled("  Per-project summary", _BOLD))
+    print()
+
+    width = max(len(name) for name, _, _ in runs) if runs else 0
+    counts = {CheckStatus.CLEAN: 0, CheckStatus.WARNING: 0, CheckStatus.ERROR: 0}
+    failed = 0
+
+    for name, build_result, check_results in runs:
+        if not build_result.success:
+            failed += 1
+            counts[CheckStatus.ERROR] += 1
+            icon = _status_icon(CheckStatus.ERROR)
+            label = _status_colored("build failed", CheckStatus.ERROR)
+        else:
+            worst = _worst_status(check_results)
+            counts[worst] += 1
+            icon = _status_icon(worst)
+            if worst == CheckStatus.CLEAN:
+                label = _status_colored("all checks passed", worst)
+            else:
+                bad = [cr.name for cr in check_results if cr.status == worst]
+                summary = ", ".join(bad) if bad else worst.value
+                label = _status_colored(summary, worst)
+        print(f"  {icon} {_styled(name.ljust(width), _BOLD)}  {label}")
+
+    print()
+    n = len(runs)
+    parts = [
+        f"{counts[CheckStatus.CLEAN]} pass",
+        f"{counts[CheckStatus.WARNING]} warn",
+        f"{counts[CheckStatus.ERROR]} fail",
+    ]
+    breakdown = ", ".join(parts)
+    if failed:
+        verdict = _styled(
+            f"  💥 {failed}/{n} project(s) failed to build  ({breakdown})",
+            _BOLD,
+            _RED,
+        )
+    elif counts[CheckStatus.WARNING]:
+        verdict = _styled(
+            f"  ⚠️  {n} project(s) built — see warnings  ({breakdown})",
+            _BOLD,
+            _YELLOW,
+        )
+    else:
+        verdict = _styled(
+            f"  ✨ All {n} project(s) clean  ({breakdown})",
+            _BOLD,
+            _GREEN,
+        )
+    print(verdict)
+    print()

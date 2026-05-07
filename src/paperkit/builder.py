@@ -67,13 +67,15 @@ def run_biber(jobname: str, output_dir: Path, project_root: Path) -> int:
     return result.returncode
 
 
-def build_paper(config: PaperkitConfig) -> BuildResult:
-    """Orchestrate the full build: N LaTeX passes with bibtex/biber after pass 1."""
+def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
+    """Orchestrate the full build for one main: N LaTeX passes with bibtex/biber after pass 1."""
+    if main is None:
+        main = config.main
     root = config.root
-    output_dir = root / config.output_dir
+    output_dir = root / config.output_dir / main
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    tex_file = root / f"{config.main}.tex"
+    tex_file = root / f"{main}.tex"
     result = BuildResult(output_dir=output_dir)
 
     use_bib = config.bibtex or config.biber
@@ -87,9 +89,9 @@ def build_paper(config: PaperkitConfig) -> BuildResult:
             step += 1
             print(f"  {_DIM}[{step}/{total_steps}]{_RESET} {bib_tool} ...")
             if config.biber:
-                run_biber(config.main, output_dir, root)
+                run_biber(main, output_dir, root)
             else:
-                aux = output_dir / f"{config.main}.aux"
+                aux = output_dir / f"{main}.aux"
                 run_bibtex(aux, root)
 
         step += 1
@@ -100,10 +102,10 @@ def build_paper(config: PaperkitConfig) -> BuildResult:
         run_latex(config.engine, tex_file, output_dir, shell_escape=config.shell_escape)
 
     # Check outputs
-    pdf_path = output_dir / f"{config.main}.pdf"
-    log_path = output_dir / f"{config.main}.log"
-    blg_path = output_dir / f"{config.main}.blg"
-    aux_path = output_dir / f"{config.main}.aux"
+    pdf_path = output_dir / f"{main}.pdf"
+    log_path = output_dir / f"{main}.log"
+    blg_path = output_dir / f"{main}.blg"
+    aux_path = output_dir / f"{main}.aux"
 
     result.log = log_path if log_path.is_file() else None
     result.blg = blg_path if blg_path.is_file() else None
@@ -112,11 +114,11 @@ def build_paper(config: PaperkitConfig) -> BuildResult:
     if pdf_path.is_file():
         result.pdf = pdf_path
         result.success = True
-        dest = root / f"{config.main}.pdf"
+        dest = root / f"{main}.pdf"
         shutil.copy2(pdf_path, dest)
-        print(f"  {_GREEN}\u2714{_RESET} {_BOLD}{config.main}.pdf{_RESET}")
+        print(f"  {_GREEN}\u2714{_RESET} {_BOLD}{main}.pdf{_RESET}")
     else:
-        print(f"  {_RED}\u2718 ERROR: {config.main}.pdf was not produced{_RESET}")
+        print(f"  {_RED}\u2718 ERROR: {main}.pdf was not produced{_RESET}")
         if log_path.is_file():
             print(f"    See {log_path} for details")
 

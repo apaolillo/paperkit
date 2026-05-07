@@ -36,8 +36,15 @@ def create_zip(config: PaperkitConfig) -> Path:
     # Remove existing
     zip_path.unlink(missing_ok=True)
 
-    # Resolve {main} in patterns
-    includes = [p.replace("{main}", config.main) for p in config.zip.include]
+    # Resolve {main} in patterns — expands once per main, so a single
+    # "{main}.tex" entry in the zip include list pulls in every project's .tex.
+    mains = config.mains or [config.main]
+    includes: list[str] = []
+    for p in config.zip.include:
+        if "{main}" in p:
+            includes.extend(p.replace("{main}", m) for m in mains)
+        else:
+            includes.append(p)
 
     # Collect files
     files: set[Path] = set()

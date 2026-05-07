@@ -34,7 +34,10 @@ class ZipConfig:
 @dataclass
 class PaperkitConfig:
     # [project]
+    # main is kept as a convenience for the single-target case and always
+    # equals mains[0]. mains is the canonical list the build/check loops over.
     main: str = "main"
+    mains: list[str] = field(default_factory=list)
     content_dirs: list[str] = field(default_factory=lambda: ["content"])
     bib: str = ""
 
@@ -88,12 +91,47 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
 
     # [project]
     proj = raw.get("project", {})
-    if "main" in proj:
-        cfg.main = proj["main"]
     if "content_dirs" in proj:
         cfg.content_dirs = proj["content_dirs"]
     if "bib" in proj:
         cfg.bib = proj["bib"]
+
+    # main / mains: accept either key, each may be a string or a list of strings,
+    # and entries may be globs that match against <root>/<pattern>.tex.
+    raw_patterns: list[str] = []
+    for key in ("main", "mains"):
+        if key not in proj:
+            continue
+        v = proj[key]
+        if isinstance(v, str):
+            raw_patterns.append(v)
+        elif isinstance(v, list) and all(isinstance(x, str) for x in v):
+            raw_patterns.extend(v)
+        else:
+            raise ValueError(f"[project] {key}: expected string or list of strings")
+
+    if not raw_patterns:
+        raw_patterns = ["main"]
+
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for pat in raw_patterns:
+        if any(c in pat for c in "*?["):
+            matches = sorted(p.stem for p in cfg.root.glob(f"{pat}.tex"))
+            if not matches:
+                raise FileNotFoundError(
+                    f"[project] '{pat}' matched no .tex files in {cfg.root}",
+                )
+            for m in matches:
+                if m not in seen:
+                    expanded.append(m)
+                    seen.add(m)
+        elif pat not in seen:
+            expanded.append(pat)
+            seen.add(pat)
+
+    cfg.mains = expanded
+    cfg.main = expanded[0]
 
     # [build]
     build = raw.get("build", {})

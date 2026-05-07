@@ -1,6 +1,10 @@
 """Click CLI entry point for paperkit."""
 
+import io
+import os
 import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from contextlib import redirect_stdout
 from pathlib import Path
 
 import click
@@ -39,17 +43,29 @@ def _get_config(ctx: click.Context) -> PaperkitConfig:
     return load_config(ctx.obj.get("config_path"))
 
 
+def _default_jobs() -> int:
+    return os.cpu_count() or 1
+
+
 @main.command()
 @click.option("--no-docker", is_flag=True, help="Build on host instead of in Docker")
+@click.option(
+    "--jobs",
+    "-j",
+    type=int,
+    default=None,
+    help=f"Parallel build workers (default: cpu_count = {_default_jobs()})",
+)
 @click.pass_context
-def build(ctx: click.Context, no_docker: bool) -> None:
-    """Build the paper PDF."""
+def build(ctx: click.Context, no_docker: bool, jobs: int | None) -> None:
+    """Build the paper PDF (loops over config.mains)."""
     config = _get_config(ctx)
+    n_jobs = jobs if jobs and jobs > 0 else _default_jobs()
 
     if no_docker:
-        _build_host(config)
+        _build_host(config, jobs=n_jobs)
     else:
-        _build_docker(config, verbose=ctx.obj["verbose"])
+        _build_docker(config, jobs=n_jobs, verbose=ctx.obj["verbose"])
 
 
 @main.command()
@@ -67,64 +83,167 @@ def shell(ctx: click.Context) -> None:
     run_in_docker(config, "bash", interactive=True, verbose=verbose)
 
 
-def _build_host(config: PaperkitConfig) -> None:
-    """Build directly on the host."""
+def _run_one(config: PaperkitConfig, main: str) -> dict:
+    """Worker entry: build one main + run checks, capturing per-build output.
+
+    Top-level function so it can be pickled by ProcessPoolExecutor. Returned
+    dict bundles BuildResult, check results, env info, and the captured
+    stdout that build_paper would have printed live.
+    """
     from paperkit.builder import build_paper
     from paperkit.checks import run_all_checks
-    from paperkit.report import get_environment_info, print_report
+    from paperkit.report import get_environment_info
 
-    click.echo(_header(f"\U0001f4c4 Building {config.main}.tex ..."))
-    result = build_paper(config)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        result = build_paper(config, main)
+        check_results = run_all_checks(config, result) if result.log or result.pdf else []
+        env_info = get_environment_info(config, result) if result.log else {}
+    return {
+        "main": main,
+        "result": result,
+        "checks": check_results,
+        "env_info": env_info,
+        "captured": buf.getvalue(),
+    }
 
-    if not result.success:
+
+def _build_host(config: PaperkitConfig, jobs: int = 1) -> None:
+    """Build directly on the host (parallel by default for multi-main)."""
+    from paperkit.builder import build_paper
+    from paperkit.checks import run_all_checks
+    from paperkit.report import get_environment_info, print_multi_summary, print_report
+
+    n = len(config.mains)
+    runs: list[tuple] = []  # type: ignore[type-arg]
+
+    # Single-main: keep the existing chatty flow (live "[k/4]" pass markers + full report).
+    if n == 1:
+        main = config.mains[0]
+        click.echo(_header(f"\U0001f4c4 Building {main}.tex ..."))
+        result = build_paper(config, main)
+        if result.success:
+            env_info = get_environment_info(config, result)
+            check_results = run_all_checks(config, result)
+            print_report(result, check_results, env_info=env_info)
+            runs.append((main, result, check_results))
+        else:
+            runs.append((main, result, []))
+            sys.exit(1)
+        return
+
+    # Multi-main: pool workers, lightweight progress, summary at the end.
+    effective_jobs = max(1, min(jobs, n))
+    click.echo(_header(f"\U0001f4c4 Building {n} project(s) (jobs={effective_jobs}) ..."))
+
+    if effective_jobs == 1:
+        # Sequential fallback — same as parallel path but without the pool.
+        completed = 0
+        for main in config.mains:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                result = build_paper(config, main)
+                checks = run_all_checks(config, result) if result.log or result.pdf else []
+                env_info = get_environment_info(config, result) if result.log else {}
+            completed += 1
+            _emit_progress(completed, n, main, result.success, buf.getvalue())
+            runs.append((main, result, checks))
+    else:
+        results_by_main: dict[str, tuple] = {}  # type: ignore[type-arg]
+        with ProcessPoolExecutor(max_workers=effective_jobs) as ex:
+            futs = {ex.submit(_run_one, config, m): m for m in config.mains}
+            completed = 0
+            for fut in as_completed(futs):
+                payload = fut.result()
+                main = payload["main"]
+                result = payload["result"]
+                checks = payload["checks"]
+                completed += 1
+                _emit_progress(completed, n, main, result.success, payload["captured"])
+                results_by_main[main] = (main, result, checks)
+        # Reorder by config.mains for the summary table.
+        runs = [results_by_main[m] for m in config.mains if m in results_by_main]
+
+    print()
+    print_multi_summary(runs)
+
+    if not all(r.success for _, r, _ in runs):
         sys.exit(1)
 
-    env_info = get_environment_info(config, result)
-    check_results = run_all_checks(config, result)
-    print_report(result, check_results, env_info=env_info)
+
+def _emit_progress(k: int, n: int, main: str, success: bool, captured: str) -> None:
+    """One-line completion marker; on failure also flush the captured per-build output."""
+    width = len(str(n))
+    marker = f"\033[32m✔\033[0m" if success else f"\033[31m✘\033[0m"
+    click.echo(f"  [{k:>{width}}/{n}] {marker} {main}")
+    if not success and captured:
+        click.echo(captured)
 
 
-def _build_docker(config: PaperkitConfig, verbose: bool = False) -> None:
-    """Build inside a Docker container."""
+def _build_docker(config: PaperkitConfig, jobs: int = 1, verbose: bool = False) -> None:
+    """Build inside a Docker container — the inner CLI invocation does the looping."""
     from paperkit.docker import build_image, run_in_docker
 
     click.echo(_header("\U0001f433 Building Docker image ..."))
     build_image(config, verbose=verbose)
 
-    click.echo(_header(f"\U0001f4c4 Building {config.main}.tex in Docker ..."))
-    run_in_docker(config, "paperkit build --no-docker", verbose=verbose)
+    n = len(config.mains)
+    label = f"{n} project(s)" if n != 1 else f"{config.main}.tex"
+    click.echo(_header(f"\U0001f4c4 Building {label} in Docker ..."))
+    run_in_docker(config, f"paperkit build --no-docker --jobs {jobs}", verbose=verbose)
 
 
 @main.command()
+@click.argument("names", nargs=-1)
 @click.pass_context
-def check(ctx: click.Context) -> None:
-    """Run checks only (on existing build output)."""
+def check(ctx: click.Context, names: tuple[str, ...]) -> None:
+    """Run checks on existing build output and print full per-main reports.
+
+    With no NAMES, checks every main in config.mains. NAMES may be given with
+    or without the .tex extension; each must be one of config.mains.
+    """
     config = _get_config(ctx)
 
     from paperkit.builder import BuildResult
-    from paperkit.checks import run_all_checks
-    from paperkit.report import get_environment_info, print_report
+    from paperkit.checks import CheckResult, run_all_checks
+    from paperkit.report import get_environment_info, print_multi_summary, print_report
 
-    output_dir = config.root / config.output_dir
-    result = BuildResult(
-        pdf=output_dir / f"{config.main}.pdf",
-        log=output_dir / f"{config.main}.log",
-        blg=output_dir / f"{config.main}.blg",
-        aux=output_dir / f"{config.main}.aux",
-        output_dir=output_dir,
-        success=True,
-    )
+    if names:
+        targets = [n[:-4] if n.endswith(".tex") else n for n in names]
+        unknown = [t for t in targets if t not in config.mains]
+        if unknown:
+            click.echo(f"Unknown main(s): {', '.join(unknown)}")
+            click.echo(f"Known mains: {', '.join(config.mains)}")
+            sys.exit(1)
+    else:
+        targets = list(config.mains)
 
-    # Verify at least the log exists
-    log_path = output_dir / f"{config.main}.log"
-    if not log_path.is_file():
-        click.echo(f"No build output found in {output_dir}/. Run 'paperkit build' first.")
+    runs: list[tuple[str, BuildResult, list[CheckResult]]] = []
+
+    for main in targets:
+        per_main_dir = config.root / config.output_dir / main
+        log_path = per_main_dir / f"{main}.log"
+        if not log_path.is_file():
+            click.echo(f"No build output for '{main}' in {per_main_dir}/. Run 'paperkit build' first.")
+            continue
+        result = BuildResult(
+            pdf=per_main_dir / f"{main}.pdf",
+            log=log_path,
+            blg=per_main_dir / f"{main}.blg",
+            aux=per_main_dir / f"{main}.aux",
+            output_dir=per_main_dir,
+            success=True,
+        )
+        click.echo(_header(f"\U0001f50d Checking {main} ..."))
+        env_info = get_environment_info(config, result)
+        check_results = run_all_checks(config, result)
+        print_report(result, check_results, env_info=env_info)
+        runs.append((main, result, check_results))
+
+    if not runs:
         sys.exit(1)
-
-    click.echo(_header("\U0001f50d Running checks ..."))
-    env_info = get_environment_info(config, result)
-    check_results = run_all_checks(config, result)
-    print_report(result, check_results, env_info=env_info)
+    if len(runs) > 1:
+        print_multi_summary(runs)
 
 
 @main.command(name="zip")
