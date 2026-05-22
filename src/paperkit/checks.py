@@ -32,7 +32,7 @@ def _collect_tex_files(config: PaperkitConfig) -> list[Path]:
     for d in config.content_dirs:
         tex_dir = config.root / d
         if tex_dir.is_dir():
-            files.extend(sorted(tex_dir.glob("*.tex")))
+            files.extend(sorted(tex_dir.rglob("*.tex")))
     for main in config.mains or [config.main]:
         main_tex = config.root / f"{main}.tex"
         if main_tex.is_file():
