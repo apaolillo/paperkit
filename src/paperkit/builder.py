@@ -117,6 +117,15 @@ def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
         dest = root / f"{main}.pdf"
         shutil.copy2(pdf_path, dest)
         print(f"  {_GREEN}\u2714{_RESET} {_BOLD}{main}.pdf{_RESET}")
+
+        # Best-effort: dump LaTeX-free title and abstract next to the PDF for
+        # easy paste into submission systems (HotCRP, EasyChair, ...).
+        from paperkit.text_export import print_text_exports, write_text_exports
+
+        try:
+            print_text_exports(write_text_exports(config, main, output_dir))
+        except Exception as exc:  # noqa: BLE001 \u2014 never fail the build for this
+            print(f"  {_DIM}(text export skipped: {exc}){_RESET}")
     else:
         print(f"  {_RED}\u2718 ERROR: {main}.pdf was not produced{_RESET}")
         if log_path.is_file():

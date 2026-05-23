@@ -40,6 +40,7 @@ _BASE_PACKAGES = [
     "poppler-utils",
     "npm",
     "unzip",
+    "pandoc",  # used by text_export to strip LaTeX from \title and \begin{abstract}
 ]
 
 # paperkit source root: two levels up from this file (src/paperkit/ -> src/ -> repo root)
