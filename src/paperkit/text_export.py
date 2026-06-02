@@ -24,15 +24,12 @@ _RESET = "\033[0m"
 
 # \title{...} with one level of balanced braces in the argument.
 _TITLE_RE = re.compile(r"\\title\s*\{((?:[^{}]|\{[^{}]*\})*)\}")
-# \begin{abstract} ... \end{abstract}, multiline.
 _ABSTRACT_RE = re.compile(r"\\begin\{abstract\}(.*?)\\end\{abstract\}", re.DOTALL)
+_MACRO_RE = re.compile(r"\\(new|renew|provide)command")
 
 
 def _latex_to_plain(snippet: str) -> str | None:
-    """Pipe a LaTeX snippet through pandoc and return single-line plain text.
-
-    Returns None if pandoc fails (missing binary, conversion error, ...).
-    """
+    """Pipe a LaTeX snippet through pandoc and return plain text."""
     if shutil.which("pandoc") is None:
         return None
     try:
@@ -48,69 +45,56 @@ def _latex_to_plain(snippet: str) -> str | None:
     return proc.stdout.strip() or None
 
 
-def _read_text(path: Path) -> str | None:
+def _flatten(main_tex: Path) -> str | None:
+    """Use latexpand to resolve all \\input/\\include references."""
+    if shutil.which("latexpand") is None:
+        return None
     try:
-        return path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        proc = subprocess.run(
+            ["latexpand", str(main_tex)],
+            capture_output=True,
+            text=True,
+            cwd=main_tex.parent,
+        )
+    except OSError:
         return None
+    return proc.stdout or None
 
 
-def extract_title(main_tex: Path) -> str | None:
-    """Return the plain-text title of *main_tex*, or None if not found."""
-    src = _read_text(main_tex)
-    if src is None:
-        return None
-    m = _TITLE_RE.search(src)
-    if m is None:
-        return None
-    return _latex_to_plain(m.group(1))
-
-
-def extract_abstract(main_tex: Path, content_dirs: list[Path]) -> str | None:
-    """Locate the abstract by scanning main_tex and content_dirs, return plain text."""
-    # main.tex itself first (handles inline abstracts)
-    candidates: list[Path] = [main_tex]
-    for d in content_dirs:
-        if d.is_dir():
-            candidates.extend(sorted(d.rglob("*.tex")))
-
-    seen: set[Path] = set()
-    for tex in candidates:
-        if tex in seen:
-            continue
-        seen.add(tex)
-        src = _read_text(tex)
-        if src is None:
-            continue
-        m = _ABSTRACT_RE.search(src)
-        if m is None:
-            continue
-        return _latex_to_plain(m.group(1))
-    return None
+def _extract_macros(preamble: str) -> str:
+    """Extract user-facing \\newcommand definitions from the preamble."""
+    return "\n".join(
+        line
+        for line in preamble.splitlines()
+        if _MACRO_RE.match(line.strip()) and "@" not in line
+    )
 
 
 def write_text_exports(config: PaperkitConfig, main: str, output_dir: Path) -> list[Path]:
     """Best-effort: write title.txt and abstract.txt alongside the PDF.
 
     Returns the list of files that were successfully written. Failures (missing
-    pandoc, no \\title, no abstract) are silent at the function level; callers
-    decide whether to surface them.
+    latexpand, pandoc, no \\title, no abstract) are silent; callers decide
+    whether to surface them.
     """
-    written: list[Path] = []
     main_tex = config.root / f"{main}.tex"
-    content_dirs = [config.root / d for d in config.content_dirs]
+    flat = _flatten(main_tex)
+    if flat is None:
+        return []
 
-    title = extract_title(main_tex)
-    if title:
-        title_path = output_dir / "title.txt"
-        title_path.write_text(title + "\n", encoding="utf-8")
-        written.append(title_path)
+    doc = re.search(r"\\begin\{document\}", flat)
+    macros = _extract_macros(flat[: doc.start()] if doc else "")
 
-    abstract = extract_abstract(main_tex, content_dirs)
-    if abstract:
-        abstract_path = output_dir / "abstract.txt"
-        abstract_path.write_text(abstract + "\n", encoding="utf-8")
-        written.append(abstract_path)
+    written: list[Path] = []
+    for regex, filename in [(_TITLE_RE, "title.txt"), (_ABSTRACT_RE, "abstract.txt")]:
+        m = regex.search(flat)
+        if m is None:
+            continue
+        plain = _latex_to_plain(macros + "\n" + m.group(1))
+        if plain:
+            path = output_dir / filename
+            path.write_text(plain + "\n", encoding="utf-8")
+            written.append(path)
 
     return written
 

@@ -32,6 +32,7 @@ _BASE_PACKAGES = [
     "texlive-pictures",
     "texlive-publishers",
     "texlive-plain-generic",
+    "texlive-extra-utils",
     # Bibliography
     "biber",
     # Tools
