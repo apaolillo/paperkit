@@ -134,10 +134,11 @@ def _print_check_detail(cr: CheckResult) -> None:
 
 
 def _worst_status(results: list[CheckResult]) -> CheckStatus:
-    """Return the worst status across all results."""
-    if any(cr.status == CheckStatus.ERROR for cr in results):
+    """Return the worst status across all results, ignoring advisory ones."""
+    binding = [cr for cr in results if not cr.advisory]
+    if any(cr.status == CheckStatus.ERROR for cr in binding):
         return CheckStatus.ERROR
-    if any(cr.status == CheckStatus.WARNING for cr in results):
+    if any(cr.status == CheckStatus.WARNING for cr in binding):
         return CheckStatus.WARNING
     return CheckStatus.CLEAN
 

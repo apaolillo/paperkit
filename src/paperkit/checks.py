@@ -24,6 +24,10 @@ class CheckResult:
     name: str
     status: CheckStatus = CheckStatus.CLEAN
     messages: list[str] = field(default_factory=list)
+    # Advisory checks render with their own status color but are excluded from
+    # the overall build verdict — useful for informational metrics (page count,
+    # etc.) whose "failure" doesn't mean the build broke.
+    advisory: bool = False
 
 
 def _collect_tex_files(config: PaperkitConfig) -> list[Path]:
@@ -230,6 +234,76 @@ def check_final_newline(config: PaperkitConfig) -> CheckResult:
     return result
 
 
+def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResult:
+    """Report total pages + section start pages; flag if over the configured limits."""
+    from paperkit import pages
+
+    result = CheckResult(name="Pages/Limit", advisory=True)
+    limits = config.page_limits
+
+    stats = pages.gather(
+        pdf_path=build_result.pdf,
+        aux_path=build_result.aux,
+        refs_pattern=limits.refs_pattern,
+        ack_pattern=limits.ack_pattern,
+    )
+
+    if stats.total is None:
+        result.messages.append("page count not available (pdfinfo missing or no PDF)")
+        return result
+
+    # Inline summary string + per-metric overage report.
+    parts: list[str] = []
+    overages: list[str] = []
+
+    def _metric(label: str, value: int | None, limit: int | None, suffix: str = "") -> None:
+        if value is None:
+            return
+        if limit is None:
+            parts.append(f"{label} {value}{suffix}")
+        else:
+            if value > limit:
+                parts.append(f"{label} {value}/{limit}{suffix} ❌")
+                overages.append(f"{label}: {value} > {limit}")
+            else:
+                parts.append(f"{label} {value}/{limit}{suffix} ✔")
+
+    _metric("total", stats.total, limits.total)
+
+    refs_before = stats.refs_page - 1 if stats.refs_page is not None else None
+    _metric(
+        "before refs",
+        refs_before,
+        limits.before_refs,
+        f" (refs at p.{stats.refs_page})" if stats.refs_page is not None else "",
+    )
+
+    ack_before = stats.ack_page - 1 if stats.ack_page is not None else None
+    _metric(
+        "before ack",
+        ack_before,
+        limits.before_ack,
+        f" (ack at p.{stats.ack_page})" if stats.ack_page is not None else "",
+    )
+
+    # Note un-detected milestones only when the user has set a limit for them.
+    if limits.before_refs is not None and stats.refs_page is None:
+        parts.append("refs not detected")
+    if limits.before_ack is not None and stats.ack_page is None:
+        parts.append("ack not detected")
+
+    summary = " │ ".join(parts) if parts else "no data"
+    if overages:
+        result.status = CheckStatus.ERROR
+        result.messages.append(summary)
+        for line in overages:
+            result.messages.append(f"  {line}")
+    else:
+        result.messages.append(summary)
+
+    return result
+
+
 def check_unused_bib(config: PaperkitConfig, aux_path: Path | None) -> CheckResult:
     """Find bib entries that are defined but never cited."""
     result = CheckResult(name="Unused bib entries")
@@ -362,5 +436,7 @@ def run_all_checks(config: PaperkitConfig, build_result: BuildResult) -> list[Ch
 
     if config.checks.bibtex_tidy.enabled:
         results.append(check_bibtex_tidy(config))
+
+    results.append(check_pages(config, build_result))
 
     return results

@@ -355,6 +355,14 @@ font_embedding = true
 overfull_boxes = true
 bibtex_tidy = {{ enabled = true, version = "1.14.0" }}
 
+# Page-count limits — leave fields unset to get an informational report only.
+# Auto-detects the references and acknowledgments sections from the .aux file
+# (English titles; override refs_pattern / ack_pattern if needed).
+# [page_limits]
+# total = 14            # max total pages (incl. references)
+# before_refs = 12      # max body pages — refs must start at page (limit+1) or later
+# before_ack = 13       # max pages before acknowledgments section starts
+
 [zip]
 name = "main"
 include = [

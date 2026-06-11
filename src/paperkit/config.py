@@ -23,6 +23,17 @@ class ChecksConfig:
 
 
 @dataclass
+class PageLimitsConfig:
+    # Hard caps. None = no limit (informational only).
+    total: int | None = None
+    before_refs: int | None = None  # max pages before references start
+    before_ack: int | None = None  # max pages before acknowledgments start
+    # Regex patterns used to spot the section in the .aux TOC entries.
+    refs_pattern: str = r"(?i)\b(references|bibliography)\b"
+    ack_pattern: str = r"(?i)acknowledg"
+
+
+@dataclass
 class ZipConfig:
     name: str = ""
     include: list[str] = field(default_factory=list)
@@ -57,6 +68,9 @@ class PaperkitConfig:
 
     # [checks]
     checks: ChecksConfig = field(default_factory=ChecksConfig)
+
+    # [page_limits]
+    page_limits: PageLimitsConfig = field(default_factory=PageLimitsConfig)
 
     # [zip]
     zip: ZipConfig = field(default_factory=ZipConfig)
@@ -166,6 +180,14 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
         if "version" in bt:
             checks.bibtex_tidy.version = bt["version"]
     cfg.checks = checks
+
+    # [page_limits]
+    pl_raw = raw.get("page_limits", {})
+    pl = PageLimitsConfig()
+    for key in ("total", "before_refs", "before_ack", "refs_pattern", "ack_pattern"):
+        if key in pl_raw:
+            setattr(pl, key, pl_raw[key])
+    cfg.page_limits = pl
 
     # [zip]
     zip_raw = raw.get("zip", {})
