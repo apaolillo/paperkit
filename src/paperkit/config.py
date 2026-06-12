@@ -26,8 +26,10 @@ class ChecksConfig:
 class PageLimitsConfig:
     # Hard caps. None = no limit (informational only).
     total: int | None = None
-    before_refs: int | None = None  # max pages before references start
-    before_ack: int | None = None  # max pages before acknowledgments start
+    # Max pages the content before the section may occupy. A section starting
+    # mid-page counts that page against the budget.
+    before_refs: int | None = None
+    before_ack: int | None = None
     # Regex patterns used to spot the section in the .aux TOC entries.
     refs_pattern: str = r"(?i)\b(references|bibliography)\b"
     ack_pattern: str = r"(?i)acknowledg"

@@ -270,26 +270,24 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
 
     _metric("total", stats.total, limits.total)
 
-    refs_before = stats.refs_page - 1 if stats.refs_page is not None else None
     _metric(
         "before refs",
-        refs_before,
+        stats.before_refs,
         limits.before_refs,
-        f" (refs at p.{stats.refs_page})" if stats.refs_page is not None else "",
+        f" (refs start p.{stats.refs_page})" if stats.refs_page is not None else "",
     )
 
-    ack_before = stats.ack_page - 1 if stats.ack_page is not None else None
     _metric(
         "before ack",
-        ack_before,
+        stats.before_ack,
         limits.before_ack,
-        f" (ack at p.{stats.ack_page})" if stats.ack_page is not None else "",
+        f" (ack starts p.{stats.ack_page})" if stats.ack_page is not None else "",
     )
 
     # Note un-detected milestones only when the user has set a limit for them.
-    if limits.before_refs is not None and stats.refs_page is None:
+    if limits.before_refs is not None and stats.before_refs is None:
         parts.append("refs not detected")
-    if limits.before_ack is not None and stats.ack_page is None:
+    if limits.before_ack is not None and stats.before_ack is None:
         parts.append("ack not detected")
 
     summary = " │ ".join(parts) if parts else "no data"

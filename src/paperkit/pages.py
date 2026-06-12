@@ -2,9 +2,11 @@
 
 Extracts:
   * total pages       — via pdfinfo
-  * refs start page   — by scanning .aux TOC entries for "References" or
-                        "Bibliography"
-  * ack  start page   — by scanning .aux TOC entries for "Acknowledg..."
+  * refs start page   — from .aux TOC entries ("References"/"Bibliography"),
+                        falling back to a pdftotext heading scan
+  * ack  start page   — same, matching "Acknowledg..."
+  * before refs/ack   — pages occupied by the content preceding each section
+                        (a section starting mid-page counts that page)
 
 Patterns are configurable for non-English papers. Page limits in
 [page_limits] flip the check to ERROR when exceeded.
@@ -25,6 +27,12 @@ class PageStats:
     total: int | None = None
     refs_page: int | None = None
     ack_page: int | None = None
+    # Number of pages occupied by the body, i.e. the content preceding the
+    # first exempt section (refs/ack form an exempt tail; one exempt section
+    # doesn't count against the other's limit). The page is counted when the
+    # exempt tail starts mid-page.
+    before_refs: int | None = None
+    before_ack: int | None = None
 
 
 # Matches \@writefile{toc}{\contentsline {section}{TITLE}{PAGE}{ANCHOR}...}
@@ -108,6 +116,61 @@ def find_section_page(toc: list[tuple[str, int]], pattern: str) -> int | None:
     return None
 
 
+def _pdf_text_pages(pdf_path: Path) -> list[str] | None:
+    """Extract per-page text via pdftotext (pages are form-feed separated)."""
+    if not pdf_path.is_file() or shutil.which("pdftotext") is None:
+        return None
+    proc = subprocess.run(
+        ["pdftotext", str(pdf_path), "-"], capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.split("\f")
+
+
+def _is_heading_line(line: str, rx: re.Pattern[str]) -> bool:
+    """True if *line* looks like a standalone section heading matching *rx*.
+
+    Headings render as short lines; small-caps fonts may introduce spurious
+    spaces ("R EFERENCES"), so we also match with spaces stripped.
+    """
+    line = line.strip()
+    if not 0 < len(line) < 30:
+        return False
+    return bool(rx.search(line) or rx.search(line.replace(" ", "")))
+
+
+def find_heading_pos(pages_text: list[str], pattern: str) -> tuple[int, int] | None:
+    """Locate *pattern* as a standalone heading line in the rendered PDF text.
+
+    Returns (page_num, line_index) of the first match, or None. Also serves
+    as fallback detection for sections that don't write to \\@writefile{toc},
+    such as IEEEtran's `\\section*{Acknowledgment}`.
+    """
+    rx = re.compile(pattern)
+    for page_num, page_text in enumerate(pages_text, start=1):
+        for line_idx, raw_line in enumerate(page_text.splitlines()):
+            if _is_heading_line(raw_line, rx):
+                return page_num, line_idx
+    return None
+
+
+def body_end_page(pages_text: list[str], heading_pos: tuple[int, int]) -> int:
+    """Page on which the body content preceding *heading_pos* ends.
+
+    If the heading sits at the top of its page (nothing but a running header
+    or page number above it), the body ended on the previous page; otherwise
+    it shares the heading's page. In double-column layouts pdftotext emits
+    text in reading order, so a heading at the top of the second column is
+    correctly preceded by first-column body text.
+    """
+    page, line_idx = heading_pos
+    lines = pages_text[page - 1].splitlines()[:line_idx]
+    preceding = sum(1 for raw_line in lines if raw_line.strip())
+    # Tolerate a few short lines above the heading (running header, page number).
+    return page if preceding > 2 else page - 1
+
+
 def get_total_pages(pdf_path: Path) -> int | None:
     """Return total PDF pages via pdfinfo, or None if it can't be read."""
     if not pdf_path.is_file() or shutil.which("pdfinfo") is None:
@@ -130,10 +193,32 @@ def gather(
 ) -> PageStats:
     """Collect all page stats; missing inputs leave fields as None."""
     stats = PageStats()
+    pages_text: list[str] | None = None
     if pdf_path is not None:
         stats.total = get_total_pages(pdf_path)
+        pages_text = _pdf_text_pages(pdf_path)
     if aux_path is not None:
         toc = parse_toc(aux_path)
         stats.refs_page = find_section_page(toc, refs_pattern)
         stats.ack_page = find_section_page(toc, ack_pattern)
+    if pages_text:
+        refs_pos = find_heading_pos(pages_text, refs_pattern)
+        ack_pos = find_heading_pos(pages_text, ack_pattern)
+        # Fallback for sections missing from the TOC (e.g. IEEEtran's
+        # `\section*{Acknowledgment}` doesn't emit `\@writefile{toc}`).
+        if stats.refs_page is None and refs_pos is not None:
+            stats.refs_page = refs_pos[0]
+        if stats.ack_page is None and ack_pos is not None:
+            stats.ack_page = ack_pos[0]
+        # Both sections are exempt from the page budget, so the body ends at
+        # the first exempt heading in reading order — content of one exempt
+        # section (e.g. acknowledgments right before references) must not
+        # count against the other's limit.
+        positions = [pos for pos in (refs_pos, ack_pos) if pos is not None]
+        if positions:
+            end = body_end_page(pages_text, min(positions))
+            if refs_pos is not None:
+                stats.before_refs = end
+            if ack_pos is not None:
+                stats.before_ack = end
     return stats
