@@ -47,7 +47,25 @@ def _default_jobs() -> int:
     return os.cpu_count() or 1
 
 
+def _resolve_targets(config: PaperkitConfig, names: tuple[str, ...]) -> list[str]:
+    """Map NAMES (with or without .tex) to entries of config.mains.
+
+    With no names, returns all of config.mains. Exits with an error listing
+    the known mains when a name doesn't match any of them.
+    """
+    if not names:
+        return list(config.mains)
+    targets = [n[:-4] if n.endswith(".tex") else n for n in names]
+    unknown = [t for t in targets if t not in config.mains]
+    if unknown:
+        click.echo(f"Unknown main(s): {', '.join(unknown)}")
+        click.echo(f"Known mains: {', '.join(config.mains)}")
+        sys.exit(1)
+    return targets
+
+
 @main.command()
+@click.argument("names", nargs=-1)
 @click.option("--no-docker", is_flag=True, help="Build on host instead of in Docker")
 @click.option(
     "--jobs",
@@ -57,15 +75,23 @@ def _default_jobs() -> int:
     help=f"Parallel build workers (default: cpu_count = {_default_jobs()})",
 )
 @click.pass_context
-def build(ctx: click.Context, no_docker: bool, jobs: int | None) -> None:
-    """Build the paper PDF (loops over config.mains)."""
+def build(ctx: click.Context, names: tuple[str, ...], no_docker: bool, jobs: int | None) -> None:
+    """Build the paper PDF (loops over config.mains).
+
+    With no NAMES, builds every main in config.mains. NAMES may be given with
+    or without the .tex extension; each must be one of config.mains. Building
+    a single main prints the full detailed report instead of the summary table.
+    """
     config = _get_config(ctx)
+    targets = _resolve_targets(config, names)
+    config.mains = targets
+    config.main = targets[0]
     n_jobs = jobs if jobs and jobs > 0 else _default_jobs()
 
     if no_docker:
         _build_host(config, jobs=n_jobs)
     else:
-        _build_docker(config, jobs=n_jobs, verbose=ctx.obj["verbose"])
+        _build_docker(config, targets=names, jobs=n_jobs, verbose=ctx.obj["verbose"])
 
 
 @main.command()
@@ -180,7 +206,12 @@ def _emit_progress(k: int, n: int, main: str, success: bool, captured: str) -> N
         click.echo(captured)
 
 
-def _build_docker(config: PaperkitConfig, jobs: int = 1, verbose: bool = False) -> None:
+def _build_docker(
+    config: PaperkitConfig,
+    targets: tuple[str, ...] = (),
+    jobs: int = 1,
+    verbose: bool = False,
+) -> None:
     """Build inside a Docker container — the inner CLI invocation does the looping."""
     from paperkit.docker import build_image, run_in_docker
 
@@ -190,7 +221,9 @@ def _build_docker(config: PaperkitConfig, jobs: int = 1, verbose: bool = False) 
     n = len(config.mains)
     label = f"{n} project(s)" if n != 1 else f"{config.main}.tex"
     click.echo(_header(f"\U0001f4c4 Building {label} in Docker ..."))
-    run_in_docker(config, f"paperkit build --no-docker --jobs {jobs}", verbose=verbose)
+    # The inner invocation re-reads .paperkit.toml, so pass the selection along.
+    args = "".join(f" {t}" for t in targets)
+    run_in_docker(config, f"paperkit build --no-docker --jobs {jobs}{args}", verbose=verbose)
 
 
 @main.command()
@@ -208,15 +241,7 @@ def check(ctx: click.Context, names: tuple[str, ...]) -> None:
     from paperkit.checks import CheckResult, run_all_checks
     from paperkit.report import get_environment_info, print_multi_summary, print_report
 
-    if names:
-        targets = [n[:-4] if n.endswith(".tex") else n for n in names]
-        unknown = [t for t in targets if t not in config.mains]
-        if unknown:
-            click.echo(f"Unknown main(s): {', '.join(unknown)}")
-            click.echo(f"Known mains: {', '.join(config.mains)}")
-            sys.exit(1)
-    else:
-        targets = list(config.mains)
+    targets = _resolve_targets(config, names)
 
     runs: list[tuple[str, BuildResult, list[CheckResult]]] = []
 
