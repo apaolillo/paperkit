@@ -61,6 +61,10 @@ class PaperkitConfig:
     bibtex: bool = True
     biber: bool = False
     output_dir: str = "out"
+    # None = use cpu_count. A positive int caps parallel workers; useful when
+    # one main includes the PDF output of another (`\includepdf`) and needs
+    # to build after it.
+    jobs: int | None = None
 
     # [docker]
     base_image: str = "ubuntu:25.04"
@@ -151,7 +155,7 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
 
     # [build]
     build = raw.get("build", {})
-    for key in ("engine", "passes", "shell_escape", "bibtex", "biber", "output_dir"):
+    for key in ("engine", "passes", "shell_escape", "bibtex", "biber", "output_dir", "jobs"):
         if key in build:
             setattr(cfg, key, build[key])
 

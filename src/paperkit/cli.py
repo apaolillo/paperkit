@@ -86,7 +86,13 @@ def build(ctx: click.Context, names: tuple[str, ...], no_docker: bool, jobs: int
     targets = _resolve_targets(config, names)
     config.mains = targets
     config.main = targets[0]
-    n_jobs = jobs if jobs and jobs > 0 else _default_jobs()
+    # Precedence: CLI --jobs > [build] jobs in .paperkit.toml > cpu_count.
+    if jobs and jobs > 0:
+        n_jobs = jobs
+    elif config.jobs and config.jobs > 0:
+        n_jobs = config.jobs
+    else:
+        n_jobs = _default_jobs()
 
     if no_docker:
         _build_host(config, jobs=n_jobs)
