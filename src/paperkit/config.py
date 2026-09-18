@@ -18,6 +18,8 @@ class ChecksConfig:
     final_newline: bool = True
     unused_bib: bool = True
     font_embedding: bool = True
+    # Part of the font_embedding check: warn on Type 3 (bitmap) fonts.
+    no_type3: bool = True
     overfull_boxes: bool = True
     bibtex_tidy: BibtexTidyConfig = field(default_factory=BibtexTidyConfig)
 
@@ -174,6 +176,7 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
         "final_newline",
         "unused_bib",
         "font_embedding",
+        "no_type3",
         "overfull_boxes",
     )
     for key in check_keys:

@@ -1,5 +1,6 @@
 """Verification checks ported from build.sh."""
 
+import contextlib
 import re
 import shutil
 import subprocess
@@ -9,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from paperkit import pages
 from paperkit.builder import BuildResult
 from paperkit.config import PaperkitConfig
 
@@ -118,8 +120,33 @@ def check_overfull_boxes(log_path: Path | None) -> CheckResult:
     return result
 
 
-def check_font_embedding(pdf_path: Path | None) -> CheckResult:
-    """Check all fonts are embedded using pdffonts."""
+def _pdffonts_columns(header: str, separator: str) -> dict[str, tuple[int, int]]:
+    """Map pdffonts column names to (start, end) spans.
+
+    Spans come from the dashed separator under the header, so they follow
+    whatever widths the installed poppler version prints.
+    """
+    columns: dict[str, tuple[int, int]] = {}
+    for m in re.finditer(r"-+", separator):
+        start, end = m.span()
+        columns[header[start:end].strip().lower()] = (start, end)
+    return columns
+
+
+def _pdffonts_field(line: str, span: tuple[int, int], name_width: int) -> str:
+    """Extract one column of a pdffonts row.
+
+    A font name longer than its column pushes the rest of the row right;
+    shift the span by the overflow so later columns still line up.
+    """
+    tokens = line.split(maxsplit=1)
+    overflow = max(0, len(tokens[0]) - name_width) if tokens else 0
+    start, end = span
+    return line[start + overflow:end + overflow].strip()
+
+
+def check_font_embedding(pdf_path: Path | None, no_type3: bool = True) -> CheckResult:
+    """Check all fonts are embedded and, optionally, none are Type 3 (bitmap)."""
     result = CheckResult(name="Fonts")
 
     if not pdf_path or not pdf_path.is_file():
@@ -140,20 +167,105 @@ def check_font_embedding(pdf_path: Path | None) -> CheckResult:
         result.messages.append("No fonts found")
         return result
 
+    columns = _pdffonts_columns(lines[0], lines[1])
+    if "name" not in columns or "type" not in columns or "emb" not in columns:
+        result.messages.append("Unrecognized pdffonts output")
+        return result
+    name_width = columns["name"][1] - columns["name"][0]
+
     font_lines = lines[2:]  # skip header + separator
     total = len(font_lines)
-    not_embedded = sum(1 for line in font_lines if len(line) >= 75 and line[72:75].strip() != "yes")
+    unembedded = [
+        line for line in font_lines
+        if _pdffonts_field(line, columns["emb"], name_width) != "yes"
+    ]
+    type3 = [
+        line for line in font_lines
+        if _pdffonts_field(line, columns["type"], name_width) == "Type 3"
+    ] if no_type3 else []
 
-    if not_embedded == 0:
-        result.messages.append(f"{total}/{total} embedded")
+    # The first message is the one-line summary shown in the report table.
+    if unembedded:
+        summary = f"{len(unembedded)}/{total} NOT embedded"
     else:
+        summary = f"{total}/{total} embedded"
+    if type3:
+        summary += f", {len(type3)} Type 3 (bitmap)"
+    elif no_type3:
+        summary += ", no Type 3"
+    result.messages.append(summary)
+
+    if unembedded:
         result.status = CheckStatus.ERROR
-        result.messages.append(f"{not_embedded}/{total} NOT embedded")
-        for line in font_lines:
-            if len(line) >= 75 and line[72:75].strip() != "yes":
-                result.messages.append(f"  {line}")
+        result.messages.append("Not embedded:")
+        result.messages.extend(f"  {line}" for line in unembedded)
+
+    type3_pages: dict[str, list[int]] = {}
+    if type3:
+        if result.status != CheckStatus.ERROR:
+            result.status = CheckStatus.WARNING
+        type3_pages = _type3_pages(pdf_path, columns, name_width)
+        result.messages.append("Type 3 (bitmap):")
+        for line in type3:
+            obj = _pdffonts_field(line, columns["object id"], name_width)
+            result.messages.append(f"  {line}{_format_pages(type3_pages.get(obj, []))}")
+        result.messages.append(
+            "  hint: usual culprits are matplotlib figures (set pdf.fonttype: 42)"
+            " and METAFONT-rendered glyphs (install cm-super or use a Type 1"
+            " alternative); run pdffonts on the figure PDFs included on those pages",
+        )
+
+    report = pdf_path.with_name("fonts.txt")
+    _write_font_report(report, proc.stdout, type3, type3_pages, columns, name_width)
+    result.messages.append(f"Full font report: {report}")
 
     return result
+
+
+def _type3_pages(
+    pdf_path: Path,
+    columns: dict[str, tuple[int, int]],
+    name_width: int,
+) -> dict[str, list[int]]:
+    """Map each Type 3 font's object ID to the pages that use it."""
+    n_pages = pages.get_total_pages(pdf_path) or 0
+    found: dict[str, list[int]] = defaultdict(list)
+    for page in range(1, n_pages + 1):
+        proc = subprocess.run(
+            ["pdffonts", "-f", str(page), "-l", str(page), str(pdf_path)],
+            capture_output=True,
+            text=True,
+        )
+        for line in proc.stdout.splitlines()[2:]:
+            if _pdffonts_field(line, columns["type"], name_width) == "Type 3":
+                found[_pdffonts_field(line, columns["object id"], name_width)].append(page)
+    return found
+
+
+def _format_pages(page_list: list[int]) -> str:
+    if not page_list:
+        return ""
+    return f"  (p. {', '.join(map(str, page_list))})"
+
+
+def _write_font_report(
+    report: Path,
+    pdffonts_output: str,
+    type3: list[str],
+    type3_pages: dict[str, list[int]],
+    columns: dict[str, tuple[int, int]],
+    name_width: int,
+) -> None:
+    """Write the full pdffonts listing plus Type 3 page locations."""
+    parts = ["# pdffonts", pdffonts_output.rstrip(), ""]
+    if type3:
+        parts.append("# Type 3 (bitmap) fonts and the pages using them")
+        for line in type3:
+            obj = _pdffonts_field(line, columns["object id"], name_width)
+            parts.append(f"{line}{_format_pages(type3_pages.get(obj, []))}")
+        parts.append("")
+    with contextlib.suppress(OSError):
+        report.write_text("\n".join(parts))
 
 
 def check_non_ascii(config: PaperkitConfig) -> CheckResult:
@@ -236,8 +348,6 @@ def check_final_newline(config: PaperkitConfig) -> CheckResult:
 
 def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResult:
     """Report total pages + section start pages; flag if over the configured limits."""
-    from paperkit import pages
-
     result = CheckResult(name="Pages/Limit", advisory=True)
     limits = config.page_limits
 
@@ -418,7 +528,7 @@ def run_all_checks(config: PaperkitConfig, build_result: BuildResult) -> list[Ch
         results.append(check_overfull_boxes(build_result.log))
 
     if config.checks.font_embedding:
-        results.append(check_font_embedding(build_result.pdf))
+        results.append(check_font_embedding(build_result.pdf, config.checks.no_type3))
 
     if config.checks.non_ascii:
         results.append(check_non_ascii(config))

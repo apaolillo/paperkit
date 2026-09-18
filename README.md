@@ -71,6 +71,8 @@ trailing_whitespace = true
 final_newline = true
 unused_bib = true
 font_embedding = true       # requires poppler-utils
+no_type3 = true             # warn on Type 3 (bitmap) fonts (part of font_embedding)
+                            # full listing + Type 3 pages: out/<main>/fonts.txt
 overfull_boxes = true
 bibtex_tidy = { enabled = true, version = "1.14.0" }
 

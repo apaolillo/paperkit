@@ -383,6 +383,7 @@ trailing_whitespace = true
 final_newline = true
 unused_bib = true
 font_embedding = true
+no_type3 = true
 overfull_boxes = true
 bibtex_tidy = {{ enabled = true, version = "1.14.0" }}
 
