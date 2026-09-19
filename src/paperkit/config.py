@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Load and validate .paperkit.toml configuration."""
 
 import datetime as dt
@@ -104,7 +107,7 @@ class PaperkitConfig:
     jobs: int | None = None
 
     # [docker]
-    base_image: str = "ubuntu:25.04"
+    base_image: str = "ubuntu:26.04"
     image_name: str = "paperkit-builder"
     extra_packages: list[str] = field(default_factory=list)
     debconf_selections: list[str] = field(default_factory=list)
@@ -129,7 +132,15 @@ class PaperkitConfig:
 
 
 TEXLIVE_SCHEMES = (
-    "basic", "context", "full", "gust", "infraonly", "medium", "minimal", "small", "tetex",
+    "basic",
+    "context",
+    "full",
+    "gust",
+    "infraonly",
+    "medium",
+    "minimal",
+    "small",
+    "tetex",
 )
 
 # Debian's texlive-* package names differ from TeX Live collection names.
@@ -142,7 +153,7 @@ _SHA512_RE = re.compile(r"[0-9a-f]{128}")
 
 
 def _strip_prefix(name: str, prefix: str) -> str:
-    return name[len(prefix):] if name.startswith(prefix) else name
+    return name[len(prefix) :] if name.startswith(prefix) else name
 
 
 def _str_list(section: str, key: str, value: object) -> list[str]:

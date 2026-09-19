@@ -1,23 +1,41 @@
 # paperkit
 
-Reusable build toolkit for LaTeX papers. Build, check, tidy, and archive (locally or in Docker).
+Reproducible builds and pre-submission checks for research papers. paperkit
+builds your paper in a container composed from a config file, then checks it
+for the problems that get submissions desk-rejected or camera-ready PDFs
+bounced: page limits, Type 3 or unembedded fonts, LaTeX errors, overfull
+boxes, unused bibliography entries. It currently supports LaTeX; Typst is on
+the [roadmap](ROADMAP.md).
 
 ## Features
 
-- **Multi-engine builds** — pdflatex, lualatex, xelatex with bibtex or biber
-- **Docker builds** — reproducible containerized builds via [pythainer](https://github.com/open-s4c/pythainer), all engines and tools pre-installed
-- **9 automated checks** — log errors, overfull boxes, font embedding, non-ASCII, trailing whitespace, final newline, unused bib entries, bibtex-tidy
-- **Colored report** — summary table with status icons and overall verdict
-- **Bibliography tidying** — run bibtex-tidy in-place with profile-specific args
-- **Submission archive** — create a zip with configurable include/exclude patterns
-- **Profile system** — base and ACM profiles for project-type defaults
+- **Container builds**: reproducible builds in Docker via
+  [pythainer](https://github.com/apaolillo/pythainer), with every engine
+  (pdflatex, lualatex, xelatex) and bibliography tool (bibtex, biber)
+  installed, or builds on the host.
+- **Pinned TeX Live**: optionally install TeX Live from a dated snapshot, so
+  every image rebuild gets the same package set.
+- **Page limits**: report total pages and pages before references and
+  acknowledgments, and flag a paper over its configured limits.
+- **Pre-submission checks**: LaTeX and bibliography log errors, overfull
+  boxes, font embedding and Type 3 fonts, non-ASCII characters, trailing
+  whitespace, final newlines, unused bibliography entries, bibtex-tidy.
+- **Several targets per project**: build a paper and its companion documents
+  in parallel, or just one of them; bibliography checks look at every target
+  sharing a bib file.
+- **Submission plumbing**: a source archive with configurable include and
+  exclude patterns, and the title and abstract exported as plain text for
+  pasting into submission forms.
+- **Profiles**: defaults per publisher (base and ACM so far).
 
 ## Installation
 
-Requires Python 3.13+.
+Requires Python 3.13+ and, for container builds, Docker.
 
 ```bash
-pip install -e .
+pip install paperkit
+# or, as an isolated command-line tool:
+uv tool install paperkit
 ```
 
 ## Quick start
@@ -61,7 +79,7 @@ biber = false               # use biber instead of bibtex
 output_dir = "out"
 
 [docker]
-base_image = "ubuntu:25.04"
+base_image = "ubuntu:26.04"
 image_name = "paper-builder"
 extra_packages = []         # additional APT packages
 
@@ -93,9 +111,9 @@ name = "base"               # base | acm
 
 | Command | Description |
 |---|---|
-| `paperkit build` | Build the paper PDF (Docker by default) |
+| `paperkit build [NAMES]` | Build the paper PDFs (Docker by default) |
 | `paperkit build --no-docker` | Build directly on the host |
-| `paperkit build --shell` | Open interactive shell in the Docker container |
+| `paperkit shell` | Open an interactive shell in the Docker container |
 | `paperkit check [NAMES]` | Run checks on existing build output (Docker by default) |
 | `paperkit check --no-docker` | Run checks with the host's tools |
 | `paperkit tidy` | Run bibtex-tidy on the bib file (in-place) |
@@ -147,9 +165,9 @@ the PDF, wherever the report is generated.
 
 ## Profiles
 
-**`base`** — Sensible defaults for any LaTeX paper. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
+**`base`**: sensible defaults for any paper. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
 
-**`acm`** — For ACM conferences/journals. Currently identical to base; reserved for future ACM-specific defaults.
+**`acm`**: for ACM conferences and journals. Currently identical to base; reserved for future ACM-specific defaults.
 
 ## Docker
 
@@ -199,7 +217,8 @@ newer packages, and no distro `texlive-*` packages are installed. The TeX Live
 layer comes before paperkit's tools, so it only rebuilds when `[texlive]` or
 the base image changes. `minted` works out of the box: TeX Live ships
 `latexminted` with its Python dependencies, and only a system `python3` is
-needed.
+needed. This is the recommended setup on `ubuntu:26.04`, whose distro
+`minted` and `latexminted` versions do not work together.
 
 **What is pinned.** The snapshot fixes the TeX Live package set: install-tl
 checks every downloaded package against the snapshot's package database
@@ -233,12 +252,15 @@ and diff the output PDF against the previous build.
 
 ## Development
 
-```bash
-pip install -e '.[dev]'
+Development uses [uv](https://docs.astral.sh/uv/); `uv.lock` pins the
+development tools, so everyone formats and lints with the same versions.
 
-black src/
-isort src/
-ruff check src/
-mypy src/
-pytest
+```bash
+uv sync                      # create .venv with paperkit and the dev tools
+
+uv run isort src tests       # formatting
+uv run black src tests
+uv run ruff check src tests  # linting
+uv run mypy src              # type checking
+uv run pytest                # tests
 ```

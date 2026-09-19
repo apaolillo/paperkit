@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Upstream TeX Live: repository resolution, install-tl profile, Docker steps.
 
 Used when `[texlive] source = "upstream"`. TeX Live is installed with
@@ -75,24 +78,29 @@ def install_profile(tl: TexliveConfig) -> str:
     profile as the complete selection and drops the scheme's own collections.
     They are added afterwards with tlmgr instead (see install_commands).
     """
-    return "\n".join([
-        f"selected_scheme scheme-{tl.scheme}",
-        f"TEXDIR {TEXDIR}",
-        f"TEXMFLOCAL {TEXDIR}/texmf-local",
-        f"TEXMFSYSCONFIG {TEXDIR}/texmf-config",
-        f"TEXMFSYSVAR {TEXDIR}/texmf-var",
-        "TEXMFHOME ~/texmf",
-        "TEXMFCONFIG ~/.texlive/texmf-config",
-        "TEXMFVAR ~/.texlive/texmf-var",
-        "instopt_adjustpath 0",
-        "instopt_adjustrepo 0",
-        "instopt_letter 0",
-        "instopt_portable 0",
-        "instopt_write18_restricted 1",
-        "tlpdbopt_autobackup 0",
-        f"tlpdbopt_install_docfiles {int(tl.docs)}",
-        f"tlpdbopt_install_srcfiles {int(tl.sources)}",
-    ]) + "\n"
+    return (
+        "\n".join(
+            [
+                f"selected_scheme scheme-{tl.scheme}",
+                f"TEXDIR {TEXDIR}",
+                f"TEXMFLOCAL {TEXDIR}/texmf-local",
+                f"TEXMFSYSCONFIG {TEXDIR}/texmf-config",
+                f"TEXMFSYSVAR {TEXDIR}/texmf-var",
+                "TEXMFHOME ~/texmf",
+                "TEXMFCONFIG ~/.texlive/texmf-config",
+                "TEXMFVAR ~/.texlive/texmf-var",
+                "instopt_adjustpath 0",
+                "instopt_adjustrepo 0",
+                "instopt_letter 0",
+                "instopt_portable 0",
+                "instopt_write18_restricted 1",
+                "tlpdbopt_autobackup 0",
+                f"tlpdbopt_install_docfiles {int(tl.docs)}",
+                f"tlpdbopt_install_srcfiles {int(tl.sources)}",
+            ]
+        )
+        + "\n"
+    )
 
 
 def tlmgr_packages(tl: TexliveConfig) -> list[str]:

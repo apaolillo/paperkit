@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for project-wide bibliography checks (unused entries per bib file)."""
 
 import os
@@ -26,7 +29,9 @@ REFS = """\
 
 
 def _project(
-    tmp_path: Path, mains: list[str], bibs: dict[str, str] | None = None,
+    tmp_path: Path,
+    mains: list[str],
+    bibs: dict[str, str] | None = None,
 ) -> PaperkitConfig:
     for name, text in (bibs or {"refs.bib": REFS}).items():
         (tmp_path / name).write_text(text)
@@ -213,7 +218,8 @@ def test_subset_reuses_fresh_aux_of_other_target(tmp_path: Path) -> None:
 
 
 def test_subset_stale_aux_uses_draft_pass(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cfg = _project(tmp_path, ["paper", "report"])
     _aux(cfg, "report", "\\citation{A}\n\\bibdata{refs}\n", age=-60)  # stale
@@ -243,7 +249,8 @@ def test_subset_without_draft_pass_never_reports_unused(tmp_path: Path) -> None:
 
 
 def test_failed_draft_pass_counts_as_not_checked(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cfg = _project(tmp_path, ["paper", "report"])
     monkeypatch.setattr(bib, "draft_usage", lambda config, name: None)
@@ -254,7 +261,8 @@ def test_failed_draft_pass_counts_as_not_checked(
 
 
 def test_failed_build_in_this_run_is_not_checked(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cfg = _project(tmp_path, ["paper", "report"])
     monkeypatch.setattr(bib, "draft_usage", lambda config, name: pytest.fail("no draft pass"))
@@ -325,7 +333,8 @@ def test_unused_bib_config_errors(raw: object, message: str) -> None:
 
 
 def test_multi_summary_prints_shared_bibliography_once(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     unused = CheckResult(
         name="Unused bib entries",

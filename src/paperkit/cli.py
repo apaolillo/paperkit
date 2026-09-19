@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Click CLI entry point for paperkit."""
 
 import io
@@ -34,7 +37,7 @@ def _header(msg: str) -> str:
 @click.option("-v", "--verbose", is_flag=True, help="Show verbose output (Docker commands, etc.)")
 @click.pass_context
 def main(ctx: click.Context, config_path: Path | None, verbose: bool) -> None:
-    """paperkit — reusable build toolkit for LaTeX papers."""
+    """paperkit: reproducible builds and pre-submission checks for research papers."""
     ctx.ensure_object(dict)
     ctx.obj["config_path"] = config_path
     ctx.obj["verbose"] = verbose
@@ -144,12 +147,12 @@ def _run_one(config: PaperkitConfig, main: str) -> dict:
 def _build_host(config: PaperkitConfig, targets: list[str], jobs: int = 1) -> None:
     """Build *targets* directly on the host (parallel by default for several)."""
     from paperkit.bibliography import project_bib_checks
-    from paperkit.builder import build_paper
-    from paperkit.checks import run_all_checks
+    from paperkit.builder import BuildResult, build_paper
+    from paperkit.checks import CheckResult, run_all_checks
     from paperkit.report import get_environment_info, print_multi_summary, print_report
 
     n = len(targets)
-    runs: list[tuple] = []  # type: ignore[type-arg]
+    runs: list[tuple[str, BuildResult, list[CheckResult]]] = []
 
     # Single target: keep the existing chatty flow (live "[k/4]" pass markers + full report).
     if n == 1:
@@ -172,19 +175,16 @@ def _build_host(config: PaperkitConfig, targets: list[str], jobs: int = 1) -> No
     click.echo(_header(f"\U0001f4c4 Building {n} project(s) (jobs={effective_jobs}) ..."))
 
     if effective_jobs == 1:
-        # Sequential fallback — same as parallel path but without the pool.
-        completed = 0
-        for main in targets:
+        # Sequential fallback: same as parallel path but without the pool.
+        for completed, main in enumerate(targets, start=1):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 result = build_paper(config, main)
                 checks = run_all_checks(config, result) if result.log or result.pdf else []
-                env_info = get_environment_info(config, result) if result.log else {}
-            completed += 1
             _emit_progress(completed, n, main, result.success, buf.getvalue())
             runs.append((main, result, checks))
     else:
-        results_by_main: dict[str, tuple] = {}  # type: ignore[type-arg]
+        results_by_main: dict[str, tuple[str, BuildResult, list[CheckResult]]] = {}
         with ProcessPoolExecutor(max_workers=effective_jobs) as ex:
             futs = {ex.submit(_run_one, config, m): m for m in targets}
             completed = 0
@@ -212,7 +212,7 @@ def _build_host(config: PaperkitConfig, targets: list[str], jobs: int = 1) -> No
 def _emit_progress(k: int, n: int, main: str, success: bool, captured: str) -> None:
     """One-line completion marker; on failure also flush the captured per-build output."""
     width = len(str(n))
-    marker = f"\033[32m✔\033[0m" if success else f"\033[31m✘\033[0m"
+    marker = "\033[32m\u2714\033[0m" if success else "\033[31m\u2718\033[0m"
     click.echo(f"  [{k:>{width}}/{n}] {marker} {main}")
     if not success and captured:
         click.echo(captured)
@@ -225,7 +225,7 @@ def _build_docker(
     jobs: int = 1,
     verbose: bool = False,
 ) -> None:
-    """Build inside a Docker container — the inner CLI invocation does the looping."""
+    """Build inside a Docker container; the inner CLI invocation does the looping."""
     from paperkit.docker import build_image, run_in_docker
 
     click.echo(_header("\U0001f433 Building Docker image ..."))
@@ -293,7 +293,9 @@ def _check_host(config: PaperkitConfig, targets: list[str]) -> None:
         per_main_dir = config.root / config.output_dir / main
         log_path = per_main_dir / f"{main}.log"
         if not log_path.is_file():
-            click.echo(f"No build output for '{main}' in {per_main_dir}/. Run 'paperkit build' first.")
+            click.echo(
+                f"No build output for '{main}' in {per_main_dir}/. Run 'paperkit build' first.",
+            )
             continue
         outputs[main] = BuildResult(
             pdf=per_main_dir / f"{main}.pdf",
@@ -421,7 +423,7 @@ bibtex = true
 output_dir = "out"
 
 [docker]
-base_image = "ubuntu:25.04"
+base_image = "ubuntu:26.04"
 image_name = "paper-builder"
 extra_packages = []
 
@@ -443,7 +445,7 @@ no_type3 = true
 overfull_boxes = true
 bibtex_tidy = {{ enabled = true, version = "1.14.0" }}
 
-# Page-count limits — leave fields unset to get an informational report only.
+# Page-count limits: leave fields unset to get an informational report only.
 # Auto-detects the references and acknowledgments sections from the .aux file
 # (English titles; override refs_pattern / ack_pattern if needed).
 # [page_limits]

@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Project-wide bibliography checks: unused entries per bib file.
 
 Several build targets may share a bib file, so an entry is unused only if no
@@ -123,7 +126,10 @@ def resolve_bib_file(root: Path, name: str) -> Path | None:
 
 
 def usage_from_dir(
-    config: PaperkitConfig, name: str, directory: Path, origin: str,
+    config: PaperkitConfig,
+    name: str,
+    directory: Path,
+    origin: str,
 ) -> TargetUsage | None:
     """Usage recorded in *directory*'s <name>.aux (and .bcf with biber)."""
     aux = directory / f"{name}.aux"
@@ -177,7 +183,9 @@ def draft_usage(config: PaperkitConfig, name: str) -> TargetUsage | None:
 
 
 def resolve_other_targets(
-    config: PaperkitConfig, known: dict[str, TargetUsage], skip: set[str],
+    config: PaperkitConfig,
+    known: dict[str, TargetUsage],
+    skip: set[str],
 ) -> tuple[dict[str, TargetUsage], list[str]]:
     """Usage of every main not in *known*: (resolved usages, names not checked).
 

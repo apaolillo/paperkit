@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Submission zip creation."""
 
 import fnmatch
@@ -36,15 +39,15 @@ def create_zip(config: PaperkitConfig) -> Path:
     # Remove existing
     zip_path.unlink(missing_ok=True)
 
-    # Resolve {main} in patterns — expands once per main, so a single
+    # Resolve {main} in patterns: expands once per main, so a single
     # "{main}.tex" entry in the zip include list pulls in every project's .tex.
     mains = config.mains or [config.main]
     includes: list[str] = []
-    for p in config.zip.include:
-        if "{main}" in p:
-            includes.extend(p.replace("{main}", m) for m in mains)
+    for include in config.zip.include:
+        if "{main}" in include:
+            includes.extend(include.replace("{main}", m) for m in mains)
         else:
-            includes.append(p)
+            includes.append(include)
 
     # Collect files
     files: set[Path] = set()

@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for the [texlive] config section and upstream TeX Live install steps."""
 
 import datetime as dt

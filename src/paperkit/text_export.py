@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Extract title and abstract from LaTeX source into plain-text files.
 
 Produces, alongside the PDF, two files inside the per-main output directory:
@@ -64,9 +67,7 @@ def _flatten(main_tex: Path) -> str | None:
 def _extract_macros(preamble: str) -> str:
     """Extract user-facing \\newcommand definitions from the preamble."""
     return "\n".join(
-        line
-        for line in preamble.splitlines()
-        if _MACRO_RE.match(line.strip()) and "@" not in line
+        line for line in preamble.splitlines() if _MACRO_RE.match(line.strip()) and "@" not in line
     )
 
 
@@ -104,4 +105,4 @@ def print_text_exports(written: list[Path]) -> None:
     if not written:
         return
     names = ", ".join(p.name for p in written)
-    print(f"  {_DIM}→ {names}{_RESET}")
+    print(f"  {_DIM}\u2192 {names}{_RESET}")

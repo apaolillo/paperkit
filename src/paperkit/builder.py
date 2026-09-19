@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """LaTeX build pipeline (pdflatex, lualatex, xelatex + bibtex/biber)."""
 
 import os

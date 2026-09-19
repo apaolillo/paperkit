@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for build-environment reporting: log banners, toolchain checks, SKIPPED."""
 
 from pathlib import Path
@@ -185,7 +188,8 @@ def test_environment_tex_line_comes_from_log(tmp_path: Path) -> None:
 
 
 def test_environment_falls_back_to_labelled_host_probe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake = tmp_path / "bin" / "pdflatex"
     fake.parent.mkdir()
@@ -198,7 +202,8 @@ def test_environment_falls_back_to_labelled_host_probe(
 
 
 def test_environment_without_log_or_engine(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("PATH", str(tmp_path))
     info = report.get_environment_info(PaperkitConfig(), BuildResult(output_dir=tmp_path))
@@ -209,7 +214,8 @@ def test_environment_without_log_or_engine(
 
 
 def test_missing_bibtex_tidy_is_skipped(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     (tmp_path / "refs.bib").write_text("@misc{a,title={A}}\n")
     cfg = PaperkitConfig(root=tmp_path, bib="refs.bib")
@@ -220,7 +226,8 @@ def test_missing_bibtex_tidy_is_skipped(
 
 
 def test_missing_pdffonts_is_skipped(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pdf = tmp_path / "paper.pdf"
     pdf.write_bytes(b"%PDF-1.5\n")
@@ -250,7 +257,8 @@ def test_skipped_row_renders_yellow(capsys: pytest.CaptureFixture[str], tmp_path
 
 
 def test_multi_summary_names_skipped_checks(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     skipped = CheckResult(name="BibTeX tidy", status=CheckStatus.SKIPPED)
     report.print_multi_summary(

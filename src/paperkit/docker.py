@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Docker image building and container execution via pythainer."""
 
 import contextlib
@@ -13,7 +16,7 @@ from pathlib import Path
 from pythainer.builders import UbuntuDockerBuilder
 from pythainer.runners import ConcreteDockerRunner
 
-from paperkit import texlive
+from paperkit import __version__, texlive
 from paperkit.config import PaperkitConfig
 
 # Lines of captured build output shown when a quiet image build fails.
@@ -57,6 +60,15 @@ _TOOL_PACKAGES = [
 
 # paperkit source root: two levels up from this file (src/paperkit/ -> src/ -> repo root)
 _PAPERKIT_SRC_ROOT = Path(__file__).resolve().parent.parent.parent
+# What `pip install` needs from a source checkout (README and LICENSE are
+# referenced by pyproject.toml). Copying only these keeps .git, .venv and
+# working files out of the image and its layer cache.
+_PAPERKIT_SRC_FILES = ("pyproject.toml", "README.md", "LICENSE", "src")
+
+
+def _is_source_checkout() -> bool:
+    """True when paperkit runs from a source tree rather than an installed wheel."""
+    return all((_PAPERKIT_SRC_ROOT / name).exists() for name in _PAPERKIT_SRC_FILES)
 
 
 @contextlib.contextmanager
@@ -114,9 +126,9 @@ def build_image(config: PaperkitConfig, verbose: bool = False) -> str:
     tl = config.texlive
     if tl.source == "upstream" and not texlive.is_pinned(tl):
         print(
-            "warning: [texlive] source = \"upstream\" without snapshot, year or repository "
+            'warning: [texlive] source = "upstream" without snapshot, year or repository '
             f"installs from the live CTAN repository ({texlive.LIVE_REPOSITORY}); "
-            "rebuilds will pick up newer packages. Set snapshot = \"YYYY-MM-DD\" to pin it.",
+            'rebuilds will pick up newer packages. Set snapshot = "YYYY-MM-DD" to pin it.',
             file=sys.stderr,
         )
 
@@ -183,13 +195,12 @@ def make_builder(config: PaperkitConfig) -> UbuntuDockerBuilder:
     if config.debconf_selections:
         builder.desc("Pre-seed debconf selections")
         joined = " && ".join(
-            f"echo {shlex.quote(s)} | debconf-set-selections"
-            for s in config.debconf_selections
+            f"echo {shlex.quote(s)} | debconf-set-selections" for s in config.debconf_selections
         )
         builder.run(joined)
         builder.space()
 
-    # Project-specific extras in a separate layer — only this layer is rebuilt
+    # Project-specific extras in a separate layer: only this layer is rebuilt
     # when extra_packages changes between projects.
     if config.extra_packages:
         builder.desc("Install project-specific extra packages")
@@ -205,8 +216,13 @@ def make_builder(config: PaperkitConfig) -> UbuntuDockerBuilder:
 
     # Copy and install paperkit into the image
     builder.desc("Install paperkit CLI")
-    builder.copy(source=_PAPERKIT_SRC_ROOT, destination=CONTAINER_PAPERKIT)
-    builder.run(f"pip install --break-system-packages {CONTAINER_PAPERKIT}")
+    if _is_source_checkout():
+        for name in _PAPERKIT_SRC_FILES:
+            builder.copy(source=_PAPERKIT_SRC_ROOT / name, destination=CONTAINER_PAPERKIT / name)
+        builder.run(f"pip install --break-system-packages {CONTAINER_PAPERKIT}")
+    else:
+        # Installed from a package index: install the same version in the image.
+        builder.run(f"pip install --break-system-packages paperkit=={__version__}")
     builder.space()
 
     builder.desc("Set working directory")

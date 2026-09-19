@@ -1,11 +1,14 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Page-count analysis from PDF + aux file.
 
 Extracts:
-  * total pages       — via pdfinfo
-  * refs start page   — from .aux TOC entries ("References"/"Bibliography"),
+  * total pages       - via pdfinfo
+  * refs start page   - from .aux TOC entries ("References"/"Bibliography"),
                         falling back to a pdftotext heading scan
-  * ack  start page   — same, matching "Acknowledg..."
-  * before refs/ack   — pages occupied by the content preceding each section
+  * ack  start page   - same, matching "Acknowledg..."
+  * before refs/ack   - pages occupied by the content preceding each section
                         (a section starting mid-page counts that page)
 
 Patterns are configurable for non-English papers. Page limits in
@@ -46,7 +49,7 @@ def _parse_toc_line(line: str) -> tuple[str, int] | None:
     line = line.lstrip()
     if not line.startswith(_TOC_PREFIX):
         return None
-    rest = line[len(_TOC_PREFIX):]
+    rest = line[len(_TOC_PREFIX) :]
 
     # Scan balanced braces for the title.
     depth = 1
@@ -63,7 +66,7 @@ def _parse_toc_line(line: str) -> tuple[str, int] | None:
     if depth != 0 or i >= len(rest):
         return None
     title = rest[:i]
-    rest = rest[i + 1:]
+    rest = rest[i + 1 :]
 
     # Expect {PAGE}
     if not rest.startswith("{"):
@@ -75,7 +78,7 @@ def _parse_toc_line(line: str) -> tuple[str, int] | None:
     try:
         return title, int(page_str)
     except ValueError:
-        return None  # roman numerals or odd page anchors — skip
+        return None  # roman numerals or odd page anchors: skip
 
 
 def _clean_title(title: str) -> str:
@@ -89,8 +92,7 @@ def _clean_title(title: str) -> str:
         title = re.sub(r"\\[a-zA-Z]+\s*\{([^{}]*)\}", r"\1", title)
     # Remove remaining lone commands
     title = re.sub(r"\\[a-zA-Z@]+", "", title)
-    title = title.replace("{", "").replace("}", "").strip()
-    return title
+    return title.replace("{", "").replace("}", "").strip()
 
 
 def parse_toc(aux_path: Path) -> list[tuple[str, int]]:
@@ -121,7 +123,9 @@ def _pdf_text_pages(pdf_path: Path) -> list[str] | None:
     if not pdf_path.is_file() or shutil.which("pdftotext") is None:
         return None
     proc = subprocess.run(
-        ["pdftotext", str(pdf_path), "-"], capture_output=True, text=True,
+        ["pdftotext", str(pdf_path), "-"],
+        capture_output=True,
+        text=True,
     )
     if proc.returncode != 0:
         return None
@@ -211,7 +215,7 @@ def gather(
         if stats.ack_page is None and ack_pos is not None:
             stats.ack_page = ack_pos[0]
         # Both sections are exempt from the page budget, so the body ends at
-        # the first exempt heading in reading order — content of one exempt
+        # the first exempt heading in reading order: content of one exempt
         # section (e.g. acknowledgments right before references) must not
         # count against the other's limit.
         positions = [pos for pos in (refs_pos, ack_pos) if pos is not None]

@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Build report formatting with colors and summary table."""
 
 import re
@@ -76,10 +79,10 @@ def print_report(
     """Print formatted build report with colors and summary table."""
     print()
 
-    # ── Detail sections ──────────────────────────────────────────────
+    # -- Detail sections --
     _print_details(check_results)
 
-    # ── Summary table ────────────────────────────────────────────────
+    # -- Summary table --
     print(_styled("  Summary", _BOLD))
     print()
 
@@ -92,7 +95,7 @@ def print_report(
     _print_rows(check_results)
     print()
 
-    # ── Overall verdict ──────────────────────────────────────────────
+    # -- Overall verdict --
     worst = _worst_status(check_results)
     if worst == CheckStatus.ERROR:
         verdict = _styled("  \U0001f4a5 Build has errors", _BOLD, _RED)
@@ -222,19 +225,19 @@ def print_multi_summary(
         breakdown += f"; bibliography: {_STATUS_STYLE[shared_worst][2]}"
     if failed:
         verdict = _styled(
-            f"  💥 {failed}/{n} project(s) failed to build  ({breakdown})",
+            f"  \U0001f4a5 {failed}/{n} project(s) failed to build  ({breakdown})",
             _BOLD,
             _RED,
         )
     elif counts[CheckStatus.WARNING] or shared_worst != CheckStatus.CLEAN:
         verdict = _styled(
-            f"  ⚠️  {n} project(s) built — see warnings  ({breakdown})",
+            f"  \u26a0\ufe0f  {n} project(s) built, see warnings  ({breakdown})",
             _BOLD,
             _YELLOW,
         )
     else:
         verdict = _styled(
-            f"  ✨ All {n} project(s) clean  ({breakdown})",
+            f"  \u2728 All {n} project(s) clean  ({breakdown})",
             _BOLD,
             _GREEN,
         )

@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Vrije Universiteit Brussel. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Verification checks ported from build.sh."""
 
 import contextlib
@@ -30,7 +33,7 @@ class CheckResult:
     status: CheckStatus = CheckStatus.CLEAN
     messages: list[str] = field(default_factory=list)
     # Advisory checks render with their own status color but are excluded from
-    # the overall build verdict — useful for informational metrics (page count,
+    # the overall build verdict; useful for informational metrics (page count,
     # etc.) whose "failure" doesn't mean the build broke.
     advisory: bool = False
     # Print the messages in the report's details even when the status is clean.
@@ -147,7 +150,7 @@ def _pdffonts_field(line: str, span: tuple[int, int], name_width: int) -> str:
     tokens = line.split(maxsplit=1)
     overflow = max(0, len(tokens[0]) - name_width) if tokens else 0
     start, end = span
-    return line[start + overflow:end + overflow].strip()
+    return line[start + overflow : end + overflow].strip()
 
 
 def check_font_embedding(pdf_path: Path | None, no_type3: bool = True) -> CheckResult:
@@ -183,13 +186,17 @@ def check_font_embedding(pdf_path: Path | None, no_type3: bool = True) -> CheckR
     font_lines = lines[2:]  # skip header + separator
     total = len(font_lines)
     unembedded = [
-        line for line in font_lines
-        if _pdffonts_field(line, columns["emb"], name_width) != "yes"
+        line for line in font_lines if _pdffonts_field(line, columns["emb"], name_width) != "yes"
     ]
-    type3 = [
-        line for line in font_lines
-        if _pdffonts_field(line, columns["type"], name_width) == "Type 3"
-    ] if no_type3 else []
+    type3 = (
+        [
+            line
+            for line in font_lines
+            if _pdffonts_field(line, columns["type"], name_width) == "Type 3"
+        ]
+        if no_type3
+        else []
+    )
 
     # The first message is the one-line summary shown in the report table.
     if unembedded:
@@ -402,10 +409,10 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
             parts.append(f"{label} {value}{suffix}")
         else:
             if value > limit:
-                parts.append(f"{label} {value}/{limit}{suffix} ❌")
+                parts.append(f"{label} {value}/{limit}{suffix} \u274c")
                 overages.append(f"{label}: {value} > {limit}")
             else:
-                parts.append(f"{label} {value}/{limit}{suffix} ✔")
+                parts.append(f"{label} {value}/{limit}{suffix} \u2714")
 
     _metric("total", stats.total, limits.total)
 
@@ -429,7 +436,7 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
     if limits.before_ack is not None and stats.before_ack is None:
         parts.append("ack not detected")
 
-    summary = " │ ".join(parts) if parts else "no data"
+    summary = " \u2502 ".join(parts) if parts else "no data"
     if overages:
         result.status = CheckStatus.ERROR
         result.messages.append(summary)
