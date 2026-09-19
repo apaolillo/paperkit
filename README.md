@@ -129,6 +129,80 @@ The Docker image includes all engines and tools regardless of the current config
 
 Pre-installed: TeX Live (all major collections + luatex + xetex), biber, pygments, poppler-utils, npm, bibtex-tidy.
 
+### TeX Live from a dated snapshot
+
+By default TeX Live comes from the base image's `texlive-*` packages, so its
+version is whatever the distribution ships, and it changes (or disappears) as
+the distribution moves on. With `source = "upstream"`, paperkit instead runs
+the official `install-tl` against a tlnet repository. Pointing it at a dated
+snapshot gives the same TeX Live package set on every image rebuild:
+
+```toml
+[texlive]
+source = "upstream"            # "distro" (default) | "upstream"
+snapshot = "2026-09-18"        # dated snapshot from texlive.info
+tlpdb_sha512 = "bcd7c792..."   # optional: pin the snapshot's package database
+scheme = "small"               # install-tl scheme (without "scheme-")
+collections = [                # added on top of the scheme (without "collection-")
+    "latexextra", "fontsrecommended", "fontsextra", "publishers",
+    "mathscience", "pictures", "bibtexextra",
+]
+packages = []                  # extra individual packages (installed with tlmgr)
+docs = false                   # install documentation files
+sources = false                # install source files
+```
+
+Repository selection, highest precedence first:
+
+| Key | Repository |
+|---|---|
+| `repository = "https://..."` | Any tlnet URL, e.g. a private mirror |
+| `snapshot = "YYYY-MM-DD"` | `https://www.texlive.info/tlnet-archive/YYYY/MM/DD/tlnet` |
+| `year = 2025` | Frozen final repository of a closed release, from the TUG historic archive |
+| none | Live CTAN mirror: current packages, **not reproducible** (paperkit warns) |
+
+`snapshot` and `year` are mutually exclusive. Collection names are TeX Live's,
+not Debian's: Debian's `texlive-science` is `mathscience`, and
+`texlive-latex-extra` is `latexextra`.
+
+TeX Live is installed under `/opt/texlive` (added to `PATH`), `tlmgr` is left
+pointing at the same repository so later `tlmgr install` calls cannot pull
+newer packages, and no distro `texlive-*` packages are installed. The TeX Live
+layer comes before paperkit's tools, so it only rebuilds when `[texlive]` or
+the base image changes. `minted` works out of the box: TeX Live ships
+`latexminted` with its Python dependencies, and only a system `python3` is
+needed.
+
+**What is pinned.** The snapshot fixes the TeX Live package set: install-tl
+checks every downloaded package against the snapshot's package database
+(`tlpkg/texlive.tlpdb`), and `tlpdb_sha512` fixes that database itself. The
+image build fails before downloading anything if the snapshot's database
+changed. To get the value:
+
+```bash
+curl -fsSL https://www.texlive.info/tlnet-archive/YYYY/MM/DD/tlnet/tlpkg/texlive.tlpdb.sha512
+```
+
+The base image is not pinned by the snapshot. It hardly matters once TeX comes
+from the snapshot (it only provides perl, python3 and paperkit's tools), but it
+can be pinned by digest:
+
+```toml
+[docker]
+base_image = "ubuntu:26.04@sha256:<digest>"
+```
+
+(`docker pull ubuntu:26.04 && docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:26.04`
+prints it.)
+
+**Availability.** texlive.info is a single volunteer-run host. If it becomes
+unavailable, use `year = ...` for a closed release (the TUG historic archive is
+mirrored), or keep a copy of the snapshot on your own server and set
+`repository`.
+
+**Bumping.** Change `snapshot`, update `tlpdb_sha512` (command above), rebuild,
+and diff the output PDF against the previous build.
+
 ## Development
 
 ```bash
@@ -138,4 +212,5 @@ black src/
 isort src/
 ruff check src/
 mypy src/
+pytest
 ```

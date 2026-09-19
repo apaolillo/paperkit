@@ -377,6 +377,14 @@ base_image = "ubuntu:25.04"
 image_name = "paper-builder"
 extra_packages = []
 
+# TeX Live from a dated upstream snapshot instead of the distro packages, for
+# identical rebuilds (see README, "TeX Live from a dated snapshot").
+# [texlive]
+# source = "upstream"
+# snapshot = "YYYY-MM-DD"
+# scheme = "small"
+# collections = ["latexextra", "fontsrecommended", "fontsextra", "bibtexextra"]
+
 [checks]
 non_ascii = true
 trailing_whitespace = true

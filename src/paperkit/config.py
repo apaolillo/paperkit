@@ -1,5 +1,7 @@
 """Load and validate .paperkit.toml configuration."""
 
+import datetime as dt
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,6 +37,28 @@ class PageLimitsConfig:
     # Regex patterns used to spot the section in the .aux TOC entries.
     refs_pattern: str = r"(?i)\b(references|bibliography)\b"
     ack_pattern: str = r"(?i)acknowledg"
+
+
+@dataclass
+class TexliveConfig:
+    # "distro": the base image's texlive-* packages. "upstream": install-tl
+    # from a tlnet repository (see paperkit.texlive for URL resolution).
+    source: str = "distro"
+    # Repository selection, highest precedence first: repository > snapshot
+    # (YYYY-MM-DD, dated tlnet archive) > year (frozen tlnet-final of a
+    # closed release) > live CTAN mirror (not reproducible).
+    repository: str | None = None
+    snapshot: str | None = None
+    year: int | None = None
+    # Expected sha512 of the repository's tlpkg/texlive.tlpdb, checked before
+    # installing so a changed repository fails the image build.
+    tlpdb_sha512: str | None = None
+    scheme: str = "small"
+    collections: list[str] = field(default_factory=list)
+    # Individual packages installed with tlmgr after install-tl.
+    packages: list[str] = field(default_factory=list)
+    docs: bool = False
+    sources: bool = False
 
 
 @dataclass
@@ -74,6 +98,9 @@ class PaperkitConfig:
     extra_packages: list[str] = field(default_factory=list)
     debconf_selections: list[str] = field(default_factory=list)
 
+    # [texlive]
+    texlive: TexliveConfig = field(default_factory=TexliveConfig)
+
     # [checks]
     checks: ChecksConfig = field(default_factory=ChecksConfig)
 
@@ -88,6 +115,120 @@ class PaperkitConfig:
 
     # resolved root directory (where .paperkit.toml lives)
     root: Path = field(default_factory=lambda: Path.cwd())
+
+
+TEXLIVE_SCHEMES = (
+    "basic", "context", "full", "gust", "infraonly", "medium", "minimal", "small", "tetex",
+)
+
+# Debian's texlive-* package names differ from TeX Live collection names.
+_DEBIAN_COLLECTION_NAMES = {"science": "mathscience"}
+
+# Names end up in a shell command and an install-tl profile, so keep them to
+# the character set CTAN package names actually use.
+_TL_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_SHA512_RE = re.compile(r"[0-9a-f]{128}")
+
+
+def _strip_prefix(name: str, prefix: str) -> str:
+    return name[len(prefix):] if name.startswith(prefix) else name
+
+
+def _str_list(section: str, key: str, value: object) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+        raise ValueError(f"[{section}] {key}: expected a list of strings")
+    return value
+
+
+def parse_texlive(raw: dict[str, object]) -> TexliveConfig:
+    """Build a TexliveConfig from the [texlive] table, rejecting bad values early."""
+    tl = TexliveConfig()
+    known = set(TexliveConfig.__dataclass_fields__)
+    unknown = sorted(set(raw) - known)
+    if unknown:
+        raise ValueError(
+            f"[texlive] unknown key(s): {', '.join(unknown)} "
+            f"(expected: {', '.join(sorted(known))})",
+        )
+
+    source = raw.get("source", tl.source)
+    if not isinstance(source, str) or source not in ("distro", "upstream"):
+        raise ValueError(f'[texlive] source: expected "distro" or "upstream", got {source!r}')
+    tl.source = source
+
+    if "snapshot" in raw and "year" in raw:
+        raise ValueError("[texlive] snapshot and year are mutually exclusive; set only one")
+
+    if "snapshot" in raw:
+        snapshot = raw["snapshot"]
+        # A bare TOML date (snapshot = 2026-09-18) parses as datetime.date.
+        if isinstance(snapshot, dt.date) and not isinstance(snapshot, dt.datetime):
+            snapshot = snapshot.isoformat()
+        if not isinstance(snapshot, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", snapshot):
+            raise ValueError(f'[texlive] snapshot: expected "YYYY-MM-DD", got {snapshot!r}')
+        try:
+            dt.date.fromisoformat(snapshot)
+        except ValueError:
+            raise ValueError(f"[texlive] snapshot: not a valid date: {snapshot!r}") from None
+        tl.snapshot = snapshot
+
+    if "year" in raw:
+        year = raw["year"]
+        if not isinstance(year, int) or isinstance(year, bool) or year < 2008:
+            raise ValueError(
+                f"[texlive] year: expected a TeX Live release year >= 2008, got {year!r}",
+            )
+        tl.year = year
+
+    if "repository" in raw:
+        repo = raw["repository"]
+        if not isinstance(repo, str) or not re.fullmatch(r"(https?|ftp)://\S+", repo):
+            raise ValueError(
+                f"[texlive] repository: expected an http(s):// or ftp:// URL, got {repo!r}",
+            )
+        tl.repository = repo.rstrip("/")
+
+    if "tlpdb_sha512" in raw:
+        digest = raw["tlpdb_sha512"]
+        if not isinstance(digest, str) or not _SHA512_RE.fullmatch(digest.lower()):
+            raise ValueError("[texlive] tlpdb_sha512: expected 128 hex characters")
+        tl.tlpdb_sha512 = digest.lower()
+
+    if "scheme" in raw:
+        scheme = raw["scheme"]
+        name = _strip_prefix(scheme, "scheme-") if isinstance(scheme, str) else ""
+        if name not in TEXLIVE_SCHEMES:
+            raise ValueError(
+                f"[texlive] scheme: unknown scheme {scheme!r} "
+                f"(expected one of: {', '.join(TEXLIVE_SCHEMES)})",
+            )
+        tl.scheme = name
+
+    for key in ("collections", "packages"):
+        if key not in raw:
+            continue
+        names = _str_list("texlive", key, raw[key])
+        if key == "collections":
+            names = [_strip_prefix(n, "collection-") for n in names]
+            for n in names:
+                hint = _DEBIAN_COLLECTION_NAMES.get(n) or (n.replace("-", "") if "-" in n else None)
+                if hint:
+                    raise ValueError(
+                        f"[texlive] collections: {n!r} looks like a Debian package name; "
+                        f"the TeX Live collection is {hint!r}",
+                    )
+        bad = [n for n in names if not _TL_NAME_RE.fullmatch(n)]
+        if bad:
+            raise ValueError(f"[texlive] {key}: invalid name(s): {', '.join(map(repr, bad))}")
+        setattr(tl, key, names)
+
+    for key in ("docs", "sources"):
+        if key in raw:
+            if not isinstance(raw[key], bool):
+                raise ValueError(f"[texlive] {key}: expected true or false")
+            setattr(tl, key, raw[key])
+
+    return tl
 
 
 def find_config(start: Path | None = None) -> Path:
@@ -166,6 +307,9 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     for key in ("base_image", "image_name", "extra_packages", "debconf_selections"):
         if key in docker:
             setattr(cfg, key, docker[key])
+
+    # [texlive]
+    cfg.texlive = parse_texlive(raw.get("texlive", {}))
 
     # [checks]
     checks_raw = raw.get("checks", {})

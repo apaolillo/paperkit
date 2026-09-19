@@ -3,6 +3,7 @@
 import re
 import subprocess
 
+from paperkit import texlive
 from paperkit.builder import BuildResult
 from paperkit.checks import CheckResult, CheckStatus
 from paperkit.config import PaperkitConfig
@@ -47,6 +48,8 @@ def get_environment_info(config: PaperkitConfig, build_result: BuildResult) -> d
     proc = subprocess.run([config.engine, "--version"], capture_output=True, text=True)
     if proc.stdout:
         info["TeX Live"] = proc.stdout.splitlines()[0]
+    if config.texlive.source == "upstream":
+        info["TeX Live source"] = texlive.describe(config.texlive)
 
     if config.profile_name == "acm" and build_result.log and build_result.log.is_file():
         text = build_result.log.read_text(errors="replace")
