@@ -77,15 +77,7 @@ def print_report(
     print()
 
     # ── Detail sections ──────────────────────────────────────────────
-    # Only print details for non-clean checks
-    has_details = False
-    for cr in check_results:
-        if cr.status != CheckStatus.CLEAN or _has_extra_info(cr):
-            if not has_details:
-                print(_styled("  Details", _BOLD, _DIM))
-                print()
-                has_details = True
-            _print_check_detail(cr)
+    _print_details(check_results)
 
     # ── Summary table ────────────────────────────────────────────────
     print(_styled("  Summary", _BOLD))
@@ -97,13 +89,7 @@ def print_report(
             print(f"  {_styled(key.rjust(24), _DIM)}  {val}")
         print()
 
-    # Check results table
-    for cr in check_results:
-        icon = _status_icon(cr.status)
-        summary = _check_summary(cr)
-        colored_summary = _status_colored(summary, cr.status)
-        print(f"  {icon} {_styled(cr.name.rjust(24), _BOLD)}  {colored_summary}")
-
+    _print_rows(check_results)
     print()
 
     # ── Overall verdict ──────────────────────────────────────────────
@@ -121,8 +107,30 @@ def print_report(
     print()
 
 
+def _print_details(check_results: list[CheckResult]) -> None:
+    """Detail sections for non-clean checks (and clean ones with extra info)."""
+    has_details = False
+    for cr in check_results:
+        if cr.status != CheckStatus.CLEAN or _has_extra_info(cr):
+            if not has_details:
+                print(_styled("  Details", _BOLD, _DIM))
+                print()
+                has_details = True
+            _print_check_detail(cr)
+
+
+def _print_rows(check_results: list[CheckResult]) -> None:
+    """One summary row per check."""
+    for cr in check_results:
+        icon = _status_icon(cr.status)
+        colored_summary = _status_colored(_check_summary(cr), cr.status)
+        print(f"  {icon} {_styled(cr.name.rjust(24), _BOLD)}  {colored_summary}")
+
+
 def _has_extra_info(cr: CheckResult) -> bool:
     """Check if a result has info worth showing beyond the summary."""
+    if cr.show_details:
+        return True
     # bibtex-tidy reports version in messages even when clean
     return cr.name == "BibTeX tidy" and any("bibtex-tidy:" in m for m in cr.messages)
 
@@ -161,8 +169,20 @@ def _worst_status(results: list[CheckResult]) -> CheckStatus:
 
 def print_multi_summary(
     runs: list[tuple[str, BuildResult, list[CheckResult]]],
+    shared: list[CheckResult] | None = None,
 ) -> None:
-    """Print a one-line-per-main summary across all builds."""
+    """Print a one-line-per-main summary across all builds.
+
+    *shared* holds project-wide results (bibliography checks, one per bib
+    file), printed once in their own block and included in the verdict.
+    """
+    if shared:
+        print(_styled("  Bibliography", _BOLD))
+        print()
+        _print_details(shared)
+        _print_rows(shared)
+        print()
+
     print(_styled("  Per-project summary", _BOLD))
     print()
 
@@ -197,13 +217,16 @@ def print_multi_summary(
         f"{counts[CheckStatus.ERROR]} fail",
     ]
     breakdown = ", ".join(parts)
+    shared_worst = _worst_status(shared or [])
+    if shared_worst != CheckStatus.CLEAN:
+        breakdown += f"; bibliography: {_STATUS_STYLE[shared_worst][2]}"
     if failed:
         verdict = _styled(
             f"  💥 {failed}/{n} project(s) failed to build  ({breakdown})",
             _BOLD,
             _RED,
         )
-    elif counts[CheckStatus.WARNING]:
+    elif counts[CheckStatus.WARNING] or shared_worst != CheckStatus.CLEAN:
         verdict = _styled(
             f"  ⚠️  {n} project(s) built — see warnings  ({breakdown})",
             _BOLD,

@@ -28,7 +28,13 @@ class BuildResult:
     success: bool = False
 
 
-def run_latex(engine: str, tex_file: Path, output_dir: Path, shell_escape: bool = True) -> int:
+def run_latex(
+    engine: str,
+    tex_file: Path,
+    output_dir: Path,
+    shell_escape: bool = True,
+    extra_args: list[str] | None = None,
+) -> int:
     """Run a single LaTeX pass (pdflatex, lualatex, or xelatex). Returns exit code."""
     cmd = [
         engine,
@@ -37,6 +43,7 @@ def run_latex(engine: str, tex_file: Path, output_dir: Path, shell_escape: bool 
     ]
     if shell_escape:
         cmd.append("-shell-escape")
+    cmd += extra_args or []
     cmd.append(str(tex_file))
 
     result = subprocess.run(cmd, capture_output=True)

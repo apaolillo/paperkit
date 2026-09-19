@@ -116,8 +116,27 @@ Global options: `--config PATH` (config file), `-v/--verbose` (show Docker comma
 | Non-ASCII | Flag non-ASCII characters in `.tex` source |
 | Trailing whitespace | Detect lines with trailing spaces |
 | Final newline | Ensure each file ends with exactly one `\n` |
-| Unused bib entries | Find defined but uncited bibliography keys |
+| Unused bib entries | Find bib entries no target cites, once per bib file (see below) |
 | BibTeX tidy | Check bibliography formatting with bibtex-tidy |
+
+**Unused bib entries across targets.** With several mains sharing a bib file,
+an entry is unused only if no target using that file cites it. paperkit reads
+which bib files each target uses and what it cites from the target's `.aux`
+(`\bibdata`, `\citation`, including `\@input` files and `\nocite{*}`) or, with
+biber, its `.bcf`; no configuration is needed. With several targets, the
+result is printed once per bib file in a "Bibliography" block.
+
+When only some targets are built or checked (`paperkit build paper`), the
+others are taken from their existing `.aux` if it is newer than their sources,
+else from one draft LaTeX pass into a scratch directory (no PDF; the real
+output is untouched). If that is disabled or fails, entries not cited by the
+checked targets are listed as "other targets not checked", never as unused.
+
+```toml
+[checks.unused_bib]      # or simply: unused_bib = true | false
+ignore = ["some_key"]    # never reported as unused (e.g. staged for later)
+draft_pass = true        # resolve other targets with a draft pass when needed
+```
 
 A check whose tool is missing (e.g. `pdffonts`, `bibtex-tidy`) is reported as
 **skipped** (yellow) and makes the verdict "OK with warnings", so it never

@@ -14,11 +14,22 @@ class BibtexTidyConfig:
 
 
 @dataclass
+class UnusedBibConfig:
+    enabled: bool = True
+    # Keys never reported as unused (e.g. an entry staged to be cited later).
+    ignore: list[str] = field(default_factory=list)
+    # When another target sharing a bib file has no up-to-date .aux, run one
+    # draft LaTeX pass (no PDF) to learn its citations. When false, entries
+    # its citations could cover are reported as "not checked", never unused.
+    draft_pass: bool = True
+
+
+@dataclass
 class ChecksConfig:
     non_ascii: bool = True
     trailing_whitespace: bool = True
     final_newline: bool = True
-    unused_bib: bool = True
+    unused_bib: UnusedBibConfig = field(default_factory=UnusedBibConfig)
     font_embedding: bool = True
     # Part of the font_embedding check: warn on Type 3 (bitmap) fonts.
     no_type3: bool = True
@@ -231,6 +242,27 @@ def parse_texlive(raw: dict[str, object]) -> TexliveConfig:
     return tl
 
 
+def parse_unused_bib(raw: object) -> UnusedBibConfig:
+    """`unused_bib = true|false`, or a `[checks.unused_bib]` table."""
+    ub = UnusedBibConfig()
+    if isinstance(raw, bool):
+        ub.enabled = raw
+        return ub
+    if not isinstance(raw, dict):
+        raise ValueError("[checks] unused_bib: expected true, false or a table")
+    unknown = sorted(set(raw) - set(UnusedBibConfig.__dataclass_fields__))
+    if unknown:
+        raise ValueError(f"[checks.unused_bib] unknown key(s): {', '.join(unknown)}")
+    for key in ("enabled", "draft_pass"):
+        if key in raw:
+            if not isinstance(raw[key], bool):
+                raise ValueError(f"[checks.unused_bib] {key}: expected true or false")
+            setattr(ub, key, raw[key])
+    if "ignore" in raw:
+        ub.ignore = _str_list("checks.unused_bib", "ignore", raw["ignore"])
+    return ub
+
+
 def find_config(start: Path | None = None) -> Path:
     """Walk up from *start* to find .paperkit.toml."""
     d = (start or Path.cwd()).resolve()
@@ -318,7 +350,6 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
         "non_ascii",
         "trailing_whitespace",
         "final_newline",
-        "unused_bib",
         "font_embedding",
         "no_type3",
         "overfull_boxes",
@@ -326,6 +357,7 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     for key in check_keys:
         if key in checks_raw:
             setattr(checks, key, checks_raw[key])
+    checks.unused_bib = parse_unused_bib(checks_raw.get("unused_bib", True))
     bt = checks_raw.get("bibtex_tidy", {})
     if isinstance(bt, dict):
         if "enabled" in bt:

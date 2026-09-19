@@ -84,9 +84,9 @@ def build(ctx: click.Context, names: tuple[str, ...], no_docker: bool, jobs: int
     a single main prints the full detailed report instead of the summary table.
     """
     config = _get_config(ctx)
+    # config.mains keeps every target: bibliography checks look at the targets
+    # not being built too, when they share a bib file.
     targets = _resolve_targets(config, names)
-    config.mains = targets
-    config.main = targets[0]
     # Precedence: CLI --jobs > [build] jobs in .paperkit.toml > cpu_count.
     if jobs and jobs > 0:
         n_jobs = jobs
@@ -96,9 +96,9 @@ def build(ctx: click.Context, names: tuple[str, ...], no_docker: bool, jobs: int
         n_jobs = _default_jobs()
 
     if no_docker:
-        _build_host(config, jobs=n_jobs)
+        _build_host(config, targets, jobs=n_jobs)
     else:
-        _build_docker(config, targets=names, jobs=n_jobs, verbose=ctx.obj["verbose"])
+        _build_docker(config, targets, names, jobs=n_jobs, verbose=ctx.obj["verbose"])
 
 
 @main.command()
@@ -141,23 +141,25 @@ def _run_one(config: PaperkitConfig, main: str) -> dict:
     }
 
 
-def _build_host(config: PaperkitConfig, jobs: int = 1) -> None:
-    """Build directly on the host (parallel by default for multi-main)."""
+def _build_host(config: PaperkitConfig, targets: list[str], jobs: int = 1) -> None:
+    """Build *targets* directly on the host (parallel by default for several)."""
+    from paperkit.bibliography import project_bib_checks
     from paperkit.builder import build_paper
     from paperkit.checks import run_all_checks
     from paperkit.report import get_environment_info, print_multi_summary, print_report
 
-    n = len(config.mains)
+    n = len(targets)
     runs: list[tuple] = []  # type: ignore[type-arg]
 
-    # Single-main: keep the existing chatty flow (live "[k/4]" pass markers + full report).
+    # Single target: keep the existing chatty flow (live "[k/4]" pass markers + full report).
     if n == 1:
-        main = config.mains[0]
+        main = targets[0]
         click.echo(_header(f"\U0001f4c4 Building {main}.tex ..."))
         result = build_paper(config, main)
         if result.success:
             env_info = get_environment_info(config, result)
-            check_results = run_all_checks(config, result)
+            bib_results = project_bib_checks(config, {main: result}, focus=[main])
+            check_results = run_all_checks(config, result, bib_results)
             print_report(result, check_results, env_info=env_info)
             runs.append((main, result, check_results))
         else:
@@ -172,7 +174,7 @@ def _build_host(config: PaperkitConfig, jobs: int = 1) -> None:
     if effective_jobs == 1:
         # Sequential fallback — same as parallel path but without the pool.
         completed = 0
-        for main in config.mains:
+        for main in targets:
             buf = io.StringIO()
             with redirect_stdout(buf):
                 result = build_paper(config, main)
@@ -184,7 +186,7 @@ def _build_host(config: PaperkitConfig, jobs: int = 1) -> None:
     else:
         results_by_main: dict[str, tuple] = {}  # type: ignore[type-arg]
         with ProcessPoolExecutor(max_workers=effective_jobs) as ex:
-            futs = {ex.submit(_run_one, config, m): m for m in config.mains}
+            futs = {ex.submit(_run_one, config, m): m for m in targets}
             completed = 0
             for fut in as_completed(futs):
                 payload = fut.result()
@@ -194,11 +196,14 @@ def _build_host(config: PaperkitConfig, jobs: int = 1) -> None:
                 completed += 1
                 _emit_progress(completed, n, main, result.success, payload["captured"])
                 results_by_main[main] = (main, result, checks)
-        # Reorder by config.mains for the summary table.
-        runs = [results_by_main[m] for m in config.mains if m in results_by_main]
+        # Reorder by target order for the summary table.
+        runs = [results_by_main[m] for m in targets if m in results_by_main]
 
     print()
-    print_multi_summary(runs)
+    built = {m: r for m, r, _ in runs if r.success}
+    failed = {m for m, r, _ in runs if not r.success}
+    shared = project_bib_checks(config, built, focus=targets, failed=failed)
+    print_multi_summary(runs, shared)
 
     if not all(r.success for _, r, _ in runs):
         sys.exit(1)
@@ -215,7 +220,8 @@ def _emit_progress(k: int, n: int, main: str, success: bool, captured: str) -> N
 
 def _build_docker(
     config: PaperkitConfig,
-    targets: tuple[str, ...] = (),
+    targets: list[str],
+    names: tuple[str, ...] = (),
     jobs: int = 1,
     verbose: bool = False,
 ) -> None:
@@ -225,13 +231,13 @@ def _build_docker(
     click.echo(_header("\U0001f433 Building Docker image ..."))
     build_image(config, verbose=verbose)
 
-    n = len(config.mains)
-    label = f"{n} project(s)" if n != 1 else f"{config.main}.tex"
+    n = len(targets)
+    label = f"{n} project(s)" if n != 1 else f"{targets[0]}.tex"
     click.echo(_header(f"\U0001f4c4 Building {label} in Docker ..."))
     # The inner invocation re-reads .paperkit.toml, so pass the selection along.
     rc = run_in_docker(
         config,
-        f"paperkit build --no-docker --jobs {jobs}{_shell_args(targets)}",
+        f"paperkit build --no-docker --jobs {jobs}{_shell_args(names)}",
         verbose=verbose,
     )
     if rc:
@@ -277,19 +283,19 @@ def _check_docker(config: PaperkitConfig, names: tuple[str, ...], verbose: bool 
 
 def _check_host(config: PaperkitConfig, targets: list[str]) -> None:
     """Run checks on the host, with the host's tools."""
+    from paperkit.bibliography import project_bib_checks
     from paperkit.builder import BuildResult
     from paperkit.checks import CheckResult, run_all_checks
     from paperkit.report import get_environment_info, print_multi_summary, print_report
 
-    runs: list[tuple[str, BuildResult, list[CheckResult]]] = []
-
+    outputs: dict[str, BuildResult] = {}
     for main in targets:
         per_main_dir = config.root / config.output_dir / main
         log_path = per_main_dir / f"{main}.log"
         if not log_path.is_file():
             click.echo(f"No build output for '{main}' in {per_main_dir}/. Run 'paperkit build' first.")
             continue
-        result = BuildResult(
+        outputs[main] = BuildResult(
             pdf=per_main_dir / f"{main}.pdf",
             log=log_path,
             blg=per_main_dir / f"{main}.blg",
@@ -297,16 +303,24 @@ def _check_host(config: PaperkitConfig, targets: list[str]) -> None:
             output_dir=per_main_dir,
             success=True,
         )
+    if not outputs:
+        sys.exit(1)
+
+    # With one target, its bibliography results go into its report; with
+    # several, they are shown once for the project after the per-target reports.
+    single = len(outputs) == 1
+    bib_results = project_bib_checks(config, outputs, focus=list(outputs))
+
+    runs: list[tuple[str, BuildResult, list[CheckResult]]] = []
+    for main, result in outputs.items():
         click.echo(_header(f"\U0001f50d Checking {main} ..."))
         env_info = get_environment_info(config, result)
-        check_results = run_all_checks(config, result)
+        check_results = run_all_checks(config, result, bib_results if single else None)
         print_report(result, check_results, env_info=env_info)
         runs.append((main, result, check_results))
 
-    if not runs:
-        sys.exit(1)
-    if len(runs) > 1:
-        print_multi_summary(runs)
+    if not single:
+        print_multi_summary(runs, bib_results)
 
 
 @main.command(name="zip")

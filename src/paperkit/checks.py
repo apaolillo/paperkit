@@ -33,6 +33,8 @@ class CheckResult:
     # the overall build verdict — useful for informational metrics (page count,
     # etc.) whose "failure" doesn't mean the build broke.
     advisory: bool = False
+    # Print the messages in the report's details even when the status is clean.
+    show_details: bool = False
 
 
 def _collect_tex_files(config: PaperkitConfig) -> list[Path]:
@@ -439,42 +441,6 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
     return result
 
 
-def check_unused_bib(config: PaperkitConfig, aux_path: Path | None) -> CheckResult:
-    """Find bib entries that are defined but never cited."""
-    result = CheckResult(name="Unused bib entries")
-    bib_path = config.root / config.bib if config.bib else None
-
-    if not aux_path or not aux_path.is_file() or not bib_path or not bib_path.is_file():
-        result.messages.append("Skipped (aux or bib file not found)")
-        return result
-
-    # Extract cited keys from .aux
-    # bibtex uses \citation{key1,key2}, biblatex/biber uses \abx@aux@cite{N}{key}
-    aux_text = aux_path.read_text(errors="replace")
-    cited: set[str] = set()
-    for m in re.finditer(r"\\citation\{([^}]+)\}", aux_text):
-        cited.update(m.group(1).split(","))
-    for m in re.finditer(r"\\abx@aux@cite\{[^}]*\}\{([^}]+)\}", aux_text):
-        cited.add(m.group(1))
-
-    # Extract defined keys from .bib
-    bib_text = bib_path.read_text(errors="replace")
-    defined: set[str] = set()
-    for m in re.finditer(r"^\s*@\w+\{([^,]+)", bib_text, re.MULTILINE):
-        defined.add(m.group(1).strip())
-
-    unused = sorted(defined - cited)
-    if not unused:
-        result.messages.append("All bib entries are cited")
-    else:
-        result.status = CheckStatus.WARNING
-        result.messages.append(f"{len(unused)} unused bib entry/entries:")
-        for key in unused:
-            result.messages.append(f"  {key}")
-
-    return result
-
-
 def check_bibtex_tidy(config: PaperkitConfig) -> CheckResult:
     """Run bibtex-tidy in dry-run mode and check for differences."""
     result = CheckResult(name="BibTeX tidy")
@@ -541,8 +507,16 @@ def check_bibtex_tidy(config: PaperkitConfig) -> CheckResult:
     return result
 
 
-def run_all_checks(config: PaperkitConfig, build_result: BuildResult) -> list[CheckResult]:
-    """Run all enabled checks and return results."""
+def run_all_checks(
+    config: PaperkitConfig,
+    build_result: BuildResult,
+    bib_results: list[CheckResult] | None = None,
+) -> list[CheckResult]:
+    """Run all enabled per-target checks and return results.
+
+    Bibliography checks span targets sharing a bib file, so the caller
+    computes them (paperkit.bibliography) and passes them in *bib_results*.
+    """
     results: list[CheckResult] = []
 
     # Log checks (always run)
@@ -570,11 +544,7 @@ def run_all_checks(config: PaperkitConfig, build_result: BuildResult) -> list[Ch
     if config.checks.final_newline:
         results.append(check_final_newline(config))
 
-    if config.checks.unused_bib:
-        results.append(check_unused_bib(config, build_result.aux))
-
-    if config.checks.bibtex_tidy.enabled:
-        results.append(check_bibtex_tidy(config))
+    results += bib_results or []
 
     results.append(check_pages(config, build_result))
 
