@@ -6,7 +6,11 @@ packages. Pointing at a dated snapshot (or the frozen tlnet-final of a closed
 release) makes every image rebuild install the same package set.
 """
 
+import datetime as dt
+import re
 import shlex
+from dataclasses import dataclass
+from pathlib import Path
 
 from paperkit.config import TexliveConfig
 
@@ -134,3 +138,69 @@ def install_commands(tl: TexliveConfig) -> list[str]:
         cmds.append(f"{tlmgr} install {' '.join(extra)}")
     cmds.append("rm -rf /tmp/install-tl* /tmp/texlive.profile")
     return cmds
+
+
+# First line of every TeX engine log, e.g.
+#   This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded ...
+#   This is LuaHBTeX, Version 1.24.0 (TeX Live 2026)  (format=lualatex ...
+_BANNER_RE = re.compile(r"This is (\S+), Version (\S+) \(([^)]*)\)")
+_TL_YEAR_RE = re.compile(r"TeX Live (\d{4})")
+
+
+@dataclass(frozen=True)
+class EngineBanner:
+    """Engine and distribution that produced a build, from its log banner."""
+
+    engine: str
+    version: str
+    distribution: str  # e.g. "TeX Live 2026", "TeX Live 2022/dev/Debian"
+
+    def __str__(self) -> str:
+        return f"{self.engine} {self.version} ({self.distribution})"
+
+    @property
+    def year(self) -> int | None:
+        m = _TL_YEAR_RE.match(self.distribution)
+        return int(m.group(1)) if m else None
+
+    @property
+    def is_distro_build(self) -> bool:
+        """True for distribution-patched TeX Live ("TeX Live 2022/dev/Debian")."""
+        return "/" in self.distribution
+
+
+def parse_log_banner(line: str) -> EngineBanner | None:
+    m = _BANNER_RE.match(line.strip())
+    return EngineBanner(*m.groups()) if m else None
+
+
+def read_log_banner(log_path: Path | None) -> EngineBanner | None:
+    """Banner of the engine that wrote *log_path*, or None without a usable log."""
+    if not log_path or not log_path.is_file():
+        return None
+    with log_path.open(errors="replace") as f:
+        return parse_log_banner(f.readline())
+
+
+def toolchain_mismatch(tl: TexliveConfig, banner: EngineBanner) -> str | None:
+    """Why *banner* cannot come from the configured upstream TeX Live, or None.
+
+    Only upstream configs set an expectation. A snapshot taken before a new
+    release is published still serves the previous one, so its year or the
+    one before is accepted.
+    """
+    if tl.source != "upstream":
+        return None
+    expected = describe(tl)
+    if banner.is_distro_build:
+        return f"built with {banner.distribution}, a distribution build; config expects {expected}"
+    year = banner.year
+    if year is None:
+        return None
+    if tl.year is not None and year != tl.year:
+        return f"built with {banner.distribution}; config expects {expected}"
+    if tl.snapshot:
+        snapshot_year = dt.date.fromisoformat(tl.snapshot).year
+        if year not in (snapshot_year - 1, snapshot_year):
+            return f"built with {banner.distribution}; config expects {expected}"
+    return None

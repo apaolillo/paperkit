@@ -2,6 +2,7 @@
 
 import io
 import os
+import shlex
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import redirect_stdout
@@ -228,26 +229,57 @@ def _build_docker(
     label = f"{n} project(s)" if n != 1 else f"{config.main}.tex"
     click.echo(_header(f"\U0001f4c4 Building {label} in Docker ..."))
     # The inner invocation re-reads .paperkit.toml, so pass the selection along.
-    args = "".join(f" {t}" for t in targets)
-    run_in_docker(config, f"paperkit build --no-docker --jobs {jobs}{args}", verbose=verbose)
+    rc = run_in_docker(
+        config,
+        f"paperkit build --no-docker --jobs {jobs}{_shell_args(targets)}",
+        verbose=verbose,
+    )
+    if rc:
+        sys.exit(rc)
+
+
+def _shell_args(args: tuple[str, ...]) -> str:
+    """Arguments quoted for the shell command run inside the container."""
+    return "".join(f" {shlex.quote(a)}" for a in args)
 
 
 @main.command()
 @click.argument("names", nargs=-1)
+@click.option("--no-docker", is_flag=True, help="Run checks on host instead of in Docker")
 @click.pass_context
-def check(ctx: click.Context, names: tuple[str, ...]) -> None:
+def check(ctx: click.Context, names: tuple[str, ...], no_docker: bool) -> None:
     """Run checks on existing build output and print full per-main reports.
 
     With no NAMES, checks every main in config.mains. NAMES may be given with
-    or without the .tex extension; each must be one of config.mains.
+    or without the .tex extension; each must be one of config.mains. Checks
+    run in the Docker image by default, so their tools (pdffonts,
+    bibtex-tidy, ...) are the ones the build used, not the host's.
     """
     config = _get_config(ctx)
+    targets = _resolve_targets(config, names)
 
+    if no_docker:
+        _check_host(config, targets)
+    else:
+        _check_docker(config, names, verbose=ctx.obj["verbose"])
+
+
+def _check_docker(config: PaperkitConfig, names: tuple[str, ...], verbose: bool = False) -> None:
+    """Run `paperkit check` inside the container."""
+    from paperkit.docker import build_image, run_in_docker
+
+    click.echo(_header("\U0001f433 Building Docker image ..."))
+    build_image(config, verbose=verbose)
+    rc = run_in_docker(config, f"paperkit check --no-docker{_shell_args(names)}", verbose=verbose)
+    if rc:
+        sys.exit(rc)
+
+
+def _check_host(config: PaperkitConfig, targets: list[str]) -> None:
+    """Run checks on the host, with the host's tools."""
     from paperkit.builder import BuildResult
     from paperkit.checks import CheckResult, run_all_checks
     from paperkit.report import get_environment_info, print_multi_summary, print_report
-
-    targets = _resolve_targets(config, names)
 
     runs: list[tuple[str, BuildResult, list[CheckResult]]] = []
 
@@ -353,7 +385,9 @@ def _tidy_docker(config: PaperkitConfig, verbose: bool = False) -> None:
     build_image(config, verbose=verbose)
 
     click.echo(_header(f"\U0001f9f9 Tidying {config.bib} in Docker ..."))
-    run_in_docker(config, "paperkit tidy --no-docker", verbose=verbose)
+    rc = run_in_docker(config, "paperkit tidy --no-docker", verbose=verbose)
+    if rc:
+        sys.exit(rc)
 
 
 @main.command()

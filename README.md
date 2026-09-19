@@ -32,7 +32,7 @@ paperkit build
 # Build on host (no Docker)
 paperkit build --no-docker
 
-# Run checks only (on existing build output)
+# Run checks only (on existing build output, in Docker by default)
 paperkit check
 
 # Tidy the bibliography
@@ -96,7 +96,8 @@ name = "base"               # base | acm
 | `paperkit build` | Build the paper PDF (Docker by default) |
 | `paperkit build --no-docker` | Build directly on the host |
 | `paperkit build --shell` | Open interactive shell in the Docker container |
-| `paperkit check` | Run checks on existing build output |
+| `paperkit check [NAMES]` | Run checks on existing build output (Docker by default) |
+| `paperkit check --no-docker` | Run checks with the host's tools |
 | `paperkit tidy` | Run bibtex-tidy on the bib file (in-place) |
 | `paperkit zip` | Create submission archive |
 | `paperkit init` | Generate a `.paperkit.toml` template |
@@ -110,12 +111,20 @@ Global options: `--config PATH` (config file), `-v/--verbose` (show Docker comma
 | LaTeX log | Parse `.log` for errors and warnings |
 | BibTeX/Biber log | Parse `.blg` for errors and warnings |
 | Boxes | Count overfull and underfull boxes |
+| Toolchain | With `[texlive] source = "upstream"`: warn if the log shows the PDF was built with another TeX Live (e.g. the host's, via `--no-docker`) |
 | Fonts | Verify all fonts are embedded (`pdffonts`) |
 | Non-ASCII | Flag non-ASCII characters in `.tex` source |
 | Trailing whitespace | Detect lines with trailing spaces |
 | Final newline | Ensure each file ends with exactly one `\n` |
 | Unused bib entries | Find defined but uncited bibliography keys |
 | BibTeX tidy | Check bibliography formatting with bibtex-tidy |
+
+A check whose tool is missing (e.g. `pdffonts`, `bibtex-tidy`) is reported as
+**skipped** (yellow) and makes the verdict "OK with warnings", so it never
+passes silently. `paperkit check` runs in the Docker image by default, where
+all tools are installed; `--no-docker` uses the host's. The TeX Live line of
+the report comes from the build log, i.e. it names the engine that produced
+the PDF, wherever the report is generated.
 
 ## Profiles
 

@@ -234,6 +234,9 @@ def run_in_docker(
 
     # Only suppress stdout ([SHELL] lines); keep stderr so the container's
     # actual output (build progress, checks) is visible to the user.
-    with _quiet_stdout(verbose):
-        runner.run(commands=[command])
+    try:
+        with _quiet_stdout(verbose):
+            runner.run(commands=[command])
+    except subprocess.CalledProcessError as e:
+        return e.returncode
     return 0

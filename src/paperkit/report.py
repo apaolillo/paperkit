@@ -1,6 +1,7 @@
 """Build report formatting with colors and summary table."""
 
 import re
+import shutil
 import subprocess
 
 from paperkit import texlive
@@ -22,6 +23,7 @@ _WHITE = "\033[37m"
 _STATUS_STYLE: dict[CheckStatus, tuple[str, str, str]] = {
     #                     emoji   color    label
     CheckStatus.CLEAN: ("\u2705", _GREEN, "pass"),
+    CheckStatus.SKIPPED: ("\u23ed\ufe0f ", _YELLOW, "skip"),
     CheckStatus.WARNING: ("\u26a0\ufe0f ", _YELLOW, "warn"),
     CheckStatus.ERROR: ("\u274c", _RED, "FAIL"),
 }
@@ -45,9 +47,16 @@ def get_environment_info(config: PaperkitConfig, build_result: BuildResult) -> d
     """Collect environment info as a dict."""
     info: dict[str, str] = {}
 
-    proc = subprocess.run([config.engine, "--version"], capture_output=True, text=True)
-    if proc.stdout:
-        info["TeX Live"] = proc.stdout.splitlines()[0]
+    # The log banner names the engine that produced the PDF, wherever this
+    # report runs; probing the engine on PATH is only a fallback.
+    banner = texlive.read_log_banner(build_result.log)
+    if banner:
+        info["TeX Live"] = str(banner)
+    elif shutil.which(config.engine):
+        proc = subprocess.run([config.engine, "--version"], capture_output=True, text=True)
+        if proc.stdout:
+            first = proc.stdout.splitlines()[0]
+            info["TeX Live"] = f"{first} (host {config.engine}, no build log)"
     if config.texlive.source == "upstream":
         info["TeX Live source"] = texlive.describe(config.texlive)
 
@@ -136,12 +145,16 @@ def _print_check_detail(cr: CheckResult) -> None:
     print()
 
 
+# Statuses that make the overall verdict a warning.
+_WARNING_LEVEL = (CheckStatus.WARNING, CheckStatus.SKIPPED)
+
+
 def _worst_status(results: list[CheckResult]) -> CheckStatus:
-    """Return the worst status across all results, ignoring advisory ones."""
+    """Worst verdict across results (CLEAN, WARNING or ERROR), ignoring advisory ones."""
     binding = [cr for cr in results if not cr.advisory]
     if any(cr.status == CheckStatus.ERROR for cr in binding):
         return CheckStatus.ERROR
-    if any(cr.status == CheckStatus.WARNING for cr in binding):
+    if any(cr.status in _WARNING_LEVEL for cr in binding):
         return CheckStatus.WARNING
     return CheckStatus.CLEAN
 
@@ -170,7 +183,8 @@ def print_multi_summary(
             if worst == CheckStatus.CLEAN:
                 label = _status_colored("all checks passed", worst)
             else:
-                bad = [cr.name for cr in check_results if cr.status == worst]
+                level = _WARNING_LEVEL if worst == CheckStatus.WARNING else (worst,)
+                bad = [cr.name for cr in check_results if cr.status in level]
                 summary = ", ".join(bad) if bad else worst.value
                 label = _status_colored(summary, worst)
         print(f"  {icon} {_styled(name.ljust(width), _BOLD)}  {label}")

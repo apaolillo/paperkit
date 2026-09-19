@@ -10,13 +10,16 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from paperkit import pages
+from paperkit import pages, texlive
 from paperkit.builder import BuildResult
 from paperkit.config import PaperkitConfig
 
 
 class CheckStatus(StrEnum):
     CLEAN = "clean"
+    # Could not run (missing tool or input): not a pass, so it is shown in
+    # yellow and counts like a warning in the overall verdict.
+    SKIPPED = "skipped"
     WARNING = "warning"
     ERROR = "error"
 
@@ -150,11 +153,13 @@ def check_font_embedding(pdf_path: Path | None, no_type3: bool = True) -> CheckR
     result = CheckResult(name="Fonts")
 
     if not pdf_path or not pdf_path.is_file():
-        result.messages.append("PDF not found")
+        result.status = CheckStatus.SKIPPED
+        result.messages.append("Skipped (PDF not found)")
         return result
 
     if not shutil.which("pdffonts"):
-        result.messages.append("pdffonts not found (install poppler-utils)")
+        result.status = CheckStatus.SKIPPED
+        result.messages.append("Skipped (pdffonts not found; install poppler-utils)")
         return result
 
     proc = subprocess.run(
@@ -268,6 +273,27 @@ def _write_font_report(
         report.write_text("\n".join(parts))
 
 
+def check_toolchain(config: PaperkitConfig, log_path: Path | None) -> CheckResult:
+    """Check the PDF was built with the TeX Live that [texlive] configures."""
+    result = CheckResult(name="Toolchain")
+    banner = texlive.read_log_banner(log_path)
+    if banner is None:
+        result.status = CheckStatus.SKIPPED
+        result.messages.append("Skipped (no engine banner in the build log)")
+        return result
+
+    mismatch = texlive.toolchain_mismatch(config.texlive, banner)
+    if mismatch:
+        result.status = CheckStatus.WARNING
+        result.messages.append(f"PDF not built with the configured TeX Live: {mismatch}")
+        result.messages.append(
+            "  was it built outside the paperkit image (e.g. `paperkit build --no-docker`)?",
+        )
+    else:
+        result.messages.append(f"{banner.distribution} ({texlive.describe(config.texlive)})")
+    return result
+
+
 def check_non_ascii(config: PaperkitConfig) -> CheckResult:
     """Flag non-ASCII characters in source .tex files."""
     result = CheckResult(name="Non-ASCII")
@@ -359,7 +385,8 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
     )
 
     if stats.total is None:
-        result.messages.append("page count not available (pdfinfo missing or no PDF)")
+        result.status = CheckStatus.SKIPPED
+        result.messages.append("Skipped (pdfinfo not found or no PDF)")
         return result
 
     # Inline summary string + per-metric overage report.
@@ -462,6 +489,7 @@ def check_bibtex_tidy(config: PaperkitConfig) -> CheckResult:
         return result
 
     if not shutil.which("bibtex-tidy"):
+        result.status = CheckStatus.SKIPPED
         result.messages.append("Skipped (bibtex-tidy not found)")
         return result
 
@@ -523,6 +551,9 @@ def run_all_checks(config: PaperkitConfig, build_result: BuildResult) -> list[Ch
     if build_result.blg:
         bib_label = "Biber" if config.biber else "BibTeX"
         results.append(check_log_errors(build_result.blg, bib_label))
+
+    if config.texlive.source == "upstream":
+        results.append(check_toolchain(config, build_result.log))
 
     if config.checks.overfull_boxes:
         results.append(check_overfull_boxes(build_result.log))
