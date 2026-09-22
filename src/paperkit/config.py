@@ -51,6 +51,10 @@ class PageLimitsConfig:
     # mid-page counts that page against the budget.
     before_refs: int | None = None
     before_ack: int | None = None
+    # False (default): references and acknowledgments are both exempt, so the
+    # budget ends at whichever comes first. True: only the references are
+    # exempt, as at venues that count acknowledgments as text.
+    ack_counts_as_content: bool = False
     # Regex patterns used to spot the section in the .aux TOC entries.
     refs_pattern: str = r"(?i)\b(references|bibliography)\b"
     ack_pattern: str = r"(?i)acknowledg"
@@ -390,6 +394,11 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     for key in ("total", "before_refs", "before_ack", "refs_pattern", "ack_pattern"):
         if key in pl_raw:
             setattr(pl, key, pl_raw[key])
+    if "ack_counts_as_content" in pl_raw:
+        value = pl_raw["ack_counts_as_content"]
+        if not isinstance(value, bool):
+            raise ValueError("[page_limits] ack_counts_as_content: expected true or false")
+        pl.ack_counts_as_content = value
     cfg.page_limits = pl
 
     # [zip]

@@ -391,6 +391,7 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
         aux_path=build_result.aux,
         refs_pattern=limits.refs_pattern,
         ack_pattern=limits.ack_pattern,
+        ack_counts_as_content=limits.ack_counts_as_content,
     )
 
     if stats.total is None:
@@ -416,11 +417,15 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
 
     _metric("total", stats.total, limits.total)
 
+    refs_note = f"refs start p.{stats.refs_page}" if stats.refs_page is not None else ""
+    if limits.ack_counts_as_content and stats.ack_page is not None:
+        # Say why the acknowledgments are inside the budget.
+        refs_note = f"{refs_note}; acks counted" if refs_note else "acks counted"
     _metric(
         "before refs",
         stats.before_refs,
         limits.before_refs,
-        f" (refs start p.{stats.refs_page})" if stats.refs_page is not None else "",
+        f" ({refs_note})" if refs_note else "",
     )
 
     _metric(

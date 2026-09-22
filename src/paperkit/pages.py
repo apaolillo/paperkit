@@ -30,10 +30,12 @@ class PageStats:
     total: int | None = None
     refs_page: int | None = None
     ack_page: int | None = None
-    # Number of pages occupied by the body, i.e. the content preceding the
-    # first exempt section (refs/ack form an exempt tail; one exempt section
-    # doesn't count against the other's limit). The page is counted when the
-    # exempt tail starts mid-page.
+    # Number of pages occupied by the content preceding each section. By
+    # default refs and ack form one exempt tail, so both hold the pages before
+    # whichever comes first: content of one exempt section must not count
+    # against the other's limit. With ack_counts_as_content the tail is the
+    # references alone, and before_ack becomes the pages before the
+    # acknowledgments. The page is counted when the section starts mid-page.
     before_refs: int | None = None
     before_ack: int | None = None
 
@@ -189,11 +191,40 @@ def get_total_pages(pdf_path: Path) -> int | None:
     return None
 
 
+def content_end_pages(
+    pages_text: list[str],
+    refs_pos: tuple[int, int] | None,
+    ack_pos: tuple[int, int] | None,
+    ack_counts_as_content: bool = False,
+) -> tuple[int | None, int | None]:
+    """Pages occupied by the content before the references and before the acks.
+
+    By default the two sections form one exempt tail: both values are the
+    pages before whichever heading comes first, so acknowledgments sitting
+    between the body and the references do not count against either limit.
+
+    With *ack_counts_as_content* only the references are exempt, as at venues
+    that count acknowledgments as text: the page budget then ends at the
+    references heading, and the acknowledgments fall inside it.
+    """
+    if ack_counts_as_content:
+        before_refs = body_end_page(pages_text, refs_pos) if refs_pos else None
+        before_ack = body_end_page(pages_text, ack_pos) if ack_pos else None
+        return before_refs, before_ack
+
+    positions = [pos for pos in (refs_pos, ack_pos) if pos is not None]
+    if not positions:
+        return None, None
+    end = body_end_page(pages_text, min(positions))
+    return (end if refs_pos else None), (end if ack_pos else None)
+
+
 def gather(
     pdf_path: Path | None,
     aux_path: Path | None,
     refs_pattern: str,
     ack_pattern: str,
+    ack_counts_as_content: bool = False,
 ) -> PageStats:
     """Collect all page stats; missing inputs leave fields as None."""
     stats = PageStats()
@@ -214,15 +245,10 @@ def gather(
             stats.refs_page = refs_pos[0]
         if stats.ack_page is None and ack_pos is not None:
             stats.ack_page = ack_pos[0]
-        # Both sections are exempt from the page budget, so the body ends at
-        # the first exempt heading in reading order: content of one exempt
-        # section (e.g. acknowledgments right before references) must not
-        # count against the other's limit.
-        positions = [pos for pos in (refs_pos, ack_pos) if pos is not None]
-        if positions:
-            end = body_end_page(pages_text, min(positions))
-            if refs_pos is not None:
-                stats.before_refs = end
-            if ack_pos is not None:
-                stats.before_ack = end
+        stats.before_refs, stats.before_ack = content_end_pages(
+            pages_text,
+            refs_pos,
+            ack_pos,
+            ack_counts_as_content,
+        )
     return stats

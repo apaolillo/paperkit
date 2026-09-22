@@ -94,6 +94,12 @@ no_type3 = true             # warn on Type 3 (bitmap) fonts (part of font_embedd
 overfull_boxes = true
 bibtex_tidy = { enabled = true, version = "1.14.0", sort = true }
 
+[page_limits]                    # optional; without it the pages are only reported
+total = 14                       # max pages, references included
+before_refs = 14                 # max pages of content before the references
+before_ack = 13                  # max pages of content before the acknowledgments
+ack_counts_as_content = false    # see below
+
 [zip]
 name = "paper"
 include = [
@@ -154,6 +160,23 @@ checked targets are listed as "other targets not checked", never as unused.
 [checks.unused_bib]      # or simply: unused_bib = true | false
 ignore = ["some_key"]    # never reported as unused (e.g. staged for later)
 draft_pass = true        # resolve other targets with a draft pass when needed
+```
+
+**Page limits.** `[page_limits]` reports the total pages and the pages of
+content before the references and the acknowledgments, and flags a paper over
+its limits. A section starting mid-page counts that page. The sections are
+found by their headings, so nothing has to be marked up in the source.
+
+By default the acknowledgments and the references are both exempt: the
+counted content ends at whichever comes first. Many venues (most ACM and
+USENIX calls, for instance) exempt only the references and count
+acknowledgments as text. Set `ack_counts_as_content = true` for those, and the
+budget ends at the references heading instead:
+
+```toml
+[page_limits]
+before_refs = 14
+ack_counts_as_content = true   # acks sit inside the 14 pages
 ```
 
 A check whose tool is missing (e.g. `pdffonts`, `bibtex-tidy`) is reported as

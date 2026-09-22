@@ -479,6 +479,9 @@ bibtex_tidy = {{ enabled = true, version = "1.14.0" }}
 # total = 14            # max total pages (incl. references)
 # before_refs = 12      # content before references must fit in 12 pages
 # before_ack = 13       # content before acknowledgments must fit in 13 pages
+# ack_counts_as_content = false   # true: acknowledgments count toward
+#                                 # before_refs, as at venues that exempt
+#                                 # only the references
 
 [zip]
 name = "main"

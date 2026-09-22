@@ -25,7 +25,9 @@ First public release.
   final newlines, unused bibliography entries (per bib file, across every
   target using it), bibtex-tidy, and the toolchain that built the PDF.
 - Page counts and limits: total pages and pages before references and
-  acknowledgments, checked against `[page_limits]`.
+  acknowledgments, checked against `[page_limits]`. Both sections are exempt
+  by default; `ack_counts_as_content = true` counts the acknowledgments as
+  content, as at venues that exempt only the references.
 - `paperkit bibtidy`: run bibtex-tidy on the bibliography in place.
   `--sort` / `--no-sort` chooses whether entries and fields are reordered;
   `[checks] bibtex_tidy.sort` sets the default for the command and the
