@@ -53,8 +53,8 @@ paperkit build --no-docker
 # Run checks only (on existing build output, in Docker by default)
 paperkit check
 
-# Tidy the bibliography
-paperkit tidy
+# Tidy the bibliography (add --no-sort to keep the entry order)
+paperkit bibtidy
 
 # Create submission archive
 paperkit zip
@@ -92,7 +92,7 @@ font_embedding = true       # requires poppler-utils
 no_type3 = true             # warn on Type 3 (bitmap) fonts (part of font_embedding)
                             # full listing + Type 3 pages: out/<main>/fonts.txt
 overfull_boxes = true
-bibtex_tidy = { enabled = true, version = "1.14.0" }
+bibtex_tidy = { enabled = true, version = "1.14.0", sort = true }
 
 [zip]
 name = "paper"
@@ -116,7 +116,7 @@ name = "base"               # base | acm
 | `paperkit shell` | Open an interactive shell in the Docker container |
 | `paperkit check [NAMES]` | Run checks on existing build output (Docker by default) |
 | `paperkit check --no-docker` | Run checks with the host's tools |
-| `paperkit tidy` | Run bibtex-tidy on the bib file (in-place) |
+| `paperkit bibtidy` | Run bibtex-tidy on the bib file (in-place); `--no-sort` keeps the entry and field order |
 | `paperkit zip` | Create submission archive |
 | `paperkit init` | Generate a `.paperkit.toml` template |
 
@@ -135,7 +135,7 @@ Global options: `--config PATH` (config file), `-v/--verbose` (show Docker comma
 | Trailing whitespace | Detect lines with trailing spaces |
 | Final newline | Ensure each file ends with exactly one `\n` |
 | Unused bib entries | Find bib entries no target cites, once per bib file (see below) |
-| BibTeX tidy | Check bibliography formatting with bibtex-tidy |
+| BibTeX tidy | Check bibliography formatting with bibtex-tidy (the same arguments `paperkit bibtidy` would apply) |
 
 **Unused bib entries across targets.** With several mains sharing a bib file,
 an entry is unused only if no target using that file cites it. paperkit reads
@@ -165,7 +165,9 @@ the PDF, wherever the report is generated.
 
 ## Profiles
 
-**`base`**: sensible defaults for any paper. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
+**`base`**: sensible defaults for any paper. With `sort = false` the two
+reordering arguments (`--sort=key`, `--sort-fields`) are dropped and the rest
+still applies. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
 
 **`acm`**: for ACM conferences and journals. Currently identical to base; reserved for future ACM-specific defaults.
 

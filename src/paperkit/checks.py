@@ -474,7 +474,7 @@ def check_bibtex_tidy(config: PaperkitConfig) -> CheckResult:
     from paperkit.profiles import get_profile
 
     profile = get_profile(config)
-    tidy_args = profile.bibtex_tidy_args()
+    tidy_args = profile.bibtex_tidy_args(sort=config.checks.bibtex_tidy.sort)
 
     # Copy bib to temp, run bibtex-tidy, compare
     with tempfile.NamedTemporaryFile(mode="w", suffix=".bib", delete=False) as tmp:

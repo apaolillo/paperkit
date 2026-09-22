@@ -14,6 +14,9 @@ from pathlib import Path
 class BibtexTidyConfig:
     enabled: bool = True
     version: str = "1.14.0"
+    # Sort entries by key and fields within entries. False keeps the file's
+    # own order, for both `paperkit bibtidy` and the tidiness check.
+    sort: bool = True
 
 
 @dataclass
@@ -375,6 +378,10 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
             checks.bibtex_tidy.enabled = bt["enabled"]
         if "version" in bt:
             checks.bibtex_tidy.version = bt["version"]
+        if "sort" in bt:
+            if not isinstance(bt["sort"], bool):
+                raise ValueError("[checks] bibtex_tidy.sort: expected true or false")
+            checks.bibtex_tidy.sort = bt["sort"]
     cfg.checks = checks
 
     # [page_limits]

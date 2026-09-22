@@ -26,7 +26,10 @@ First public release.
   target using it), bibtex-tidy, and the toolchain that built the PDF.
 - Page counts and limits: total pages and pages before references and
   acknowledgments, checked against `[page_limits]`.
-- `paperkit tidy`: run bibtex-tidy on the bibliography in place.
+- `paperkit bibtidy`: run bibtex-tidy on the bibliography in place.
+  `--sort` / `--no-sort` chooses whether entries and fields are reordered;
+  `[checks] bibtex_tidy.sort` sets the default for the command and the
+  tidiness check alike. `paperkit tidy` still works as a hidden alias.
 - `paperkit zip`: submission archive with configurable include and exclude
   patterns.
 - Plain-text title and abstract exported next to each PDF, for pasting into

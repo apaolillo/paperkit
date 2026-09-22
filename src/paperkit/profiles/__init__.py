@@ -13,9 +13,12 @@ class BaseProfile:
         """Extra packages beyond the base set (see docker._BASE_PACKAGES)."""
         return []
 
-    def bibtex_tidy_args(self) -> list[str]:
-        """Arguments for bibtex-tidy."""
-        return [
+    # Reordering arguments, dropped when sorting is off.
+    SORT_ARGS = ("--sort=key", "--sort-fields")
+
+    def bibtex_tidy_args(self, sort: bool = True) -> list[str]:
+        """Arguments for bibtex-tidy; *sort* also reorders entries and fields."""
+        args = [
             "--curly",
             "--blank-lines",
             "--sort=key",
@@ -27,6 +30,7 @@ class BaseProfile:
             "--enclosing-braces=title",
             "--align=13",
         ]
+        return args if sort else [a for a in args if a not in self.SORT_ARGS]
 
     def bibtex_tidy_version(self) -> str:
         return "1.14.0"

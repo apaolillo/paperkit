@@ -340,15 +340,38 @@ def zip_cmd(ctx: click.Context) -> None:
 
 @main.command()
 @click.option("--no-docker", is_flag=True, help="Run on host instead of in Docker")
+@click.option(
+    "--sort/--no-sort",
+    default=None,
+    help="Sort entries by key and fields within entries "
+    "(default: [checks] bibtex_tidy.sort, itself true)",
+)
 @click.pass_context
-def tidy(ctx: click.Context, no_docker: bool) -> None:
-    """Run bibtex-tidy on the bib file (in-place)."""
+def bibtidy(ctx: click.Context, no_docker: bool, sort: bool | None) -> None:
+    """Run bibtex-tidy on the bib file (in-place).
+
+    --no-sort keeps the file's own entry and field order and applies the
+    other defaults. Without the flag, [checks] bibtex_tidy.sort decides, so
+    the tidiness check in `paperkit build` agrees with this command.
+    """
     config = _get_config(ctx)
+    if sort is not None:
+        config.checks.bibtex_tidy.sort = sort
 
     if no_docker:
         _tidy_host(config)
     else:
         _tidy_docker(config, verbose=ctx.obj["verbose"])
+
+
+@main.command(name="tidy", hidden=True)
+@click.option("--no-docker", is_flag=True)
+@click.option("--sort/--no-sort", default=None)
+@click.pass_context
+def tidy(ctx: click.Context, no_docker: bool, sort: bool | None) -> None:
+    """Deprecated alias for `bibtidy`."""
+    click.echo("warning: 'paperkit tidy' is now 'paperkit bibtidy'.", err=True)
+    ctx.invoke(bibtidy, no_docker=no_docker, sort=sort)
 
 
 def _tidy_host(config: PaperkitConfig) -> None:
@@ -368,9 +391,11 @@ def _tidy_host(config: PaperkitConfig) -> None:
         sys.exit(1)
 
     profile = get_profile(config)
-    tidy_args = profile.bibtex_tidy_args()
+    sort = config.checks.bibtex_tidy.sort
+    tidy_args = profile.bibtex_tidy_args(sort=sort)
 
-    click.echo(_header(f"\U0001f9f9 Tidying {config.bib} ..."))
+    how = "sorted" if sort else "unsorted"
+    click.echo(_header(f"\U0001f9f9 Tidying {config.bib} ({how}) ..."))
     proc = subprocess.run(
         ["bibtex-tidy", *tidy_args, str(bib_path)],
         capture_output=True,
@@ -401,7 +426,9 @@ def _tidy_docker(config: PaperkitConfig, verbose: bool = False) -> None:
     build_image(config, verbose=verbose)
 
     click.echo(_header(f"\U0001f9f9 Tidying {config.bib} in Docker ..."))
-    rc = run_in_docker(config, "paperkit tidy --no-docker", verbose=verbose)
+    # The inner invocation re-reads .paperkit.toml, so pass the sort choice along.
+    sort_flag = "--sort" if config.checks.bibtex_tidy.sort else "--no-sort"
+    rc = run_in_docker(config, f"paperkit bibtidy --no-docker {sort_flag}", verbose=verbose)
     if rc:
         sys.exit(rc)
 
