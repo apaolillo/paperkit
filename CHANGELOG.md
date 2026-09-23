@@ -35,5 +35,7 @@ First public release.
 - `paperkit zip`: submission archive with configurable include and exclude
   patterns.
 - Plain-text title and abstract exported next to each PDF, for pasting into
-  submission forms.
+  submission forms. `\input`/`\include` files are resolved in Python, so no
+  latexpand is needed, and a skipped export says why instead of staying
+  silent.
 - `paperkit shell` and `paperkit init`, and `base` and `acm` profiles.
