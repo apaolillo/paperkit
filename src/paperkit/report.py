@@ -7,7 +7,7 @@ import re
 import shutil
 import subprocess
 
-from paperkit import texlive
+from paperkit import reproducible, texlive
 from paperkit.builder import BuildResult
 from paperkit.checks import CheckResult, CheckStatus
 from paperkit.config import PaperkitConfig
@@ -62,6 +62,7 @@ def get_environment_info(config: PaperkitConfig, build_result: BuildResult) -> d
             info["TeX Live"] = f"{first} (host {config.engine}, no build log)"
     if config.texlive.source == "upstream":
         info["TeX Live source"] = texlive.describe(config.texlive)
+    info["Source date"] = str(reproducible.resolve(config.source_date_epoch, config.root))
 
     if config.profile_name == "acm" and build_result.log and build_result.log.is_file():
         text = build_result.log.read_text(errors="replace")

@@ -9,6 +9,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from paperkit import reproducible
 from paperkit.config import PaperkitConfig
 
 # ANSI
@@ -37,8 +38,15 @@ def run_latex(
     output_dir: Path,
     shell_escape: bool = True,
     extra_args: list[str] | None = None,
+    env: dict[str, str] | None = None,
+    prelude: str = "",
 ) -> int:
-    """Run a single LaTeX pass (pdflatex, lualatex, or xelatex). Returns exit code."""
+    """Run a single LaTeX pass (pdflatex, lualatex, or xelatex). Returns exit code.
+
+    *prelude* is TeX code executed before the main file is read; the job name
+    is then set explicitly, since the engine would otherwise name the job
+    after that code instead of the file.
+    """
     cmd = [
         engine,
         "-interaction=nonstopmode",
@@ -47,15 +55,28 @@ def run_latex(
     if shell_escape:
         cmd.append("-shell-escape")
     cmd += extra_args or []
-    cmd.append(str(tex_file))
+    if prelude:
+        cmd.append(f"-jobname={tex_file.stem}")
+        cmd.append(f"{prelude}\\input{{{tex_file}}}")
+    else:
+        cmd.append(str(tex_file))
 
-    result = subprocess.run(cmd, capture_output=True)
+    result = subprocess.run(cmd, capture_output=True, env=_environment(env))
     return result.returncode
 
 
-def run_bibtex(aux_file: Path, bib_search_dir: Path) -> int:
-    """Run bibtex with BIBINPUTS pointing to *bib_search_dir*. Returns exit code."""
+def _environment(extra: dict[str, str] | None) -> dict[str, str]:
+    """The caller's environment plus *extra*."""
     env = os.environ.copy()
+    env.update(extra or {})
+    return env
+
+
+def run_bibtex(
+    aux_file: Path, bib_search_dir: Path, extra_env: dict[str, str] | None = None
+) -> int:
+    """Run bibtex with BIBINPUTS pointing to *bib_search_dir*. Returns exit code."""
+    env = _environment(extra_env)
     env["BIBINPUTS"] = f"{bib_search_dir}:"
 
     result = subprocess.run(
@@ -67,12 +88,18 @@ def run_bibtex(aux_file: Path, bib_search_dir: Path) -> int:
     return result.returncode
 
 
-def run_biber(jobname: str, output_dir: Path, project_root: Path) -> int:
+def run_biber(
+    jobname: str,
+    output_dir: Path,
+    project_root: Path,
+    extra_env: dict[str, str] | None = None,
+) -> int:
     """Run biber from the project root with output in *output_dir*. Returns exit code."""
     result = subprocess.run(
         ["biber", f"--output-directory={output_dir}", jobname],
         cwd=project_root,
         capture_output=True,
+        env=_environment(extra_env),
     )
     return result.returncode
 
@@ -88,6 +115,17 @@ def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
     tex_file = root / f"{main}.tex"
     result = BuildResult(output_dir=output_dir)
 
+    # One timestamp for the whole pipeline, so rebuilds are byte-identical.
+    source_date = reproducible.resolve(config.source_date_epoch, root)
+    if source_date.warning:
+        print(f"  {_DIM}warning: {source_date.warning}{_RESET}")
+    env = reproducible.build_env(source_date)
+    prelude = (
+        reproducible.trailer_id_code(config.engine, source_date, main)
+        if reproducible.needs_trailer_id(config.engine)
+        else ""
+    )
+
     use_bib = config.bibtex or config.biber
     bib_tool = "biber" if config.biber else "bibtex"
     total_steps = config.passes + (1 if use_bib else 0)
@@ -99,17 +137,24 @@ def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
             step += 1
             print(f"  {_DIM}[{step}/{total_steps}]{_RESET} {bib_tool} ...")
             if config.biber:
-                run_biber(main, output_dir, root)
+                run_biber(main, output_dir, root, env)
             else:
                 aux = output_dir / f"{main}.aux"
-                run_bibtex(aux, root)
+                run_bibtex(aux, root, env)
 
         step += 1
         label = f"pass {i}"
         if i == config.passes and config.passes >= 4:
             label += " \u2013 pbalance"
         print(f"  {_DIM}[{step}/{total_steps}]{_RESET} {config.engine} ({label}) ...")
-        run_latex(config.engine, tex_file, output_dir, shell_escape=config.shell_escape)
+        run_latex(
+            config.engine,
+            tex_file,
+            output_dir,
+            shell_escape=config.shell_escape,
+            env=env,
+            prelude=prelude,
+        )
 
     # Check outputs
     pdf_path = output_dir / f"{main}.pdf"

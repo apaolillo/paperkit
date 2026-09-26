@@ -32,6 +32,13 @@ First public release.
   `--sort` / `--no-sort` chooses whether entries and fields are reordered;
   `[checks] bibtex_tidy.sort` sets the default for the command and the
   tidiness check alike. `paperkit tidy` still works as a hidden alias.
+- Byte-reproducible builds: every engine, bibtex and biber run is pinned to
+  one timestamp (`SOURCE_DATE_EPOCH` and `FORCE_SOURCE_DATE`, forwarded into
+  the container), which fixes the PDF dates and font subset tags, and the
+  trailer id is pinned too where the toolchain does not derive it from that
+  timestamp. `[build] source_date_epoch` takes an epoch, an ISO date, or
+  "git" (default: HEAD's committer date), and the report shows the timestamp
+  used.
 - `paperkit zip`: submission archive with configurable include and exclude
   patterns.
 - Plain-text title and abstract exported next to each PDF, for pasting into

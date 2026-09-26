@@ -77,6 +77,7 @@ shell_escape = true
 bibtex = true               # use bibtex after pass 1
 biber = false               # use biber instead of bibtex
 output_dir = "out"
+source_date_epoch = "git"   # timestamp builds are pinned to; see below
 
 [docker]
 base_image = "ubuntu:26.04"
@@ -199,6 +200,38 @@ still applies. Default bibtex-tidy args: `--curly --blank-lines --sort=key --dup
 The Docker image includes all engines and tools regardless of the current config, so switching between pdflatex/lualatex or bibtex/biber requires no rebuild.
 
 Pre-installed: TeX Live (all major collections + luatex + xetex), biber, pygments, poppler-utils, npm, bibtex-tidy.
+
+### Reproducible builds
+
+Two builds of the same sources differ in three places, all written by the PDF
+writer: the creation and modification dates, the random tags of subsetted
+fonts (`VHDZTM+Calibri` one run, `EJHWCU+Calibri` the next), and the trailer
+`/ID`. paperkit pins all three, so rebuilding gives byte-identical output.
+
+Every engine, bibtex and biber run gets `SOURCE_DATE_EPOCH` and
+`FORCE_SOURCE_DATE`, on the host and inside the container alike. The
+timestamp comes from `[build] source_date_epoch`:
+
+| Value | Meaning |
+|---|---|
+| `"git"` (default) | the committer date of HEAD |
+| an integer | that epoch |
+| an ISO date or date-time | that moment (dates are UTC midnight) |
+
+A `SOURCE_DATE_EPOCH` already set in your environment wins over the config.
+Outside a git repository, or before the first commit, paperkit warns that the
+build is not reproducible and uses the current time. The report prints the
+timestamp it used, so you can tell what a given PDF was built with:
+
+```
+Source date  1789898400 (2026-09-20 10:00:00 UTC, from git)
+```
+
+The trailer `/ID` needs help on older toolchains: from TeX Live 2024 on,
+xdvipdfmx derives it from the epoch, but earlier versions do not, so paperkit
+pins it from the epoch and the main's name (each main of a project gets its
+own). Your sources are untouched: the definition is passed on the engine's
+command line.
 
 ### TeX Live from a dated snapshot
 

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import click
 
+from paperkit import reproducible
 from paperkit.config import PaperkitConfig, load_config
 
 # ANSI
@@ -234,11 +235,17 @@ def _build_docker(
     n = len(targets)
     label = f"{n} project(s)" if n != 1 else f"{targets[0]}.tex"
     click.echo(_header(f"\U0001f4c4 Building {label} in Docker ..."))
+    # The image has no git, so resolve the build timestamp here and pass it in;
+    # the inner paperkit then takes it from the environment.
+    source_date = reproducible.resolve(config.source_date_epoch, config.root)
+    if source_date.warning:
+        click.echo(f"  {_DIM}warning: {source_date.warning}{_RESET}")
     # The inner invocation re-reads .paperkit.toml, so pass the selection along.
     rc = run_in_docker(
         config,
         f"paperkit build --no-docker --jobs {jobs}{_shell_args(names)}",
         verbose=verbose,
+        env=reproducible.build_env(source_date),
     )
     if rc:
         sys.exit(rc)

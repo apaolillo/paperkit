@@ -235,14 +235,21 @@ def run_in_docker(
     command: str,
     interactive: bool = False,
     verbose: bool = False,
+    env: dict[str, str] | None = None,
 ) -> int:
-    """Run a command inside the Docker container. Returns exit code."""
+    """Run a command inside the Docker container. Returns exit code.
+
+    *env* is passed with `docker run --env`. The build timestamp travels this
+    way: the image has no git, so the host resolves it and the inner paperkit
+    picks it up from the environment.
+    """
     runner = ConcreteDockerRunner(
         image=config.image_name,
         name=f"{config.image_name}-run",
         volumes={
             str(config.root): str(CONTAINER_WORKDIR),
         },
+        environment_variables=env or {},
         workdir=CONTAINER_WORKDIR,
         tty=True,
         interactive=interactive,

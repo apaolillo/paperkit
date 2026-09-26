@@ -9,6 +9,8 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from paperkit import reproducible
+
 
 @dataclass
 class BibtexTidyConfig:
@@ -112,6 +114,9 @@ class PaperkitConfig:
     # one main includes the PDF output of another (`\includepdf`) and needs
     # to build after it.
     jobs: int | None = None
+    # Timestamp every tool builds with, for byte-identical rebuilds: an
+    # epoch, an ISO date, or "git" (HEAD's committer date).
+    source_date_epoch: int | str = "git"
 
     # [docker]
     base_image: str = "ubuntu:26.04"
@@ -351,6 +356,8 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     for key in ("engine", "passes", "shell_escape", "bibtex", "biber", "output_dir", "jobs"):
         if key in build:
             setattr(cfg, key, build[key])
+    if "source_date_epoch" in build:
+        cfg.source_date_epoch = reproducible.parse_setting(build["source_date_epoch"])
 
     # [docker]
     docker = raw.get("docker", {})
