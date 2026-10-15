@@ -237,6 +237,12 @@ timestamp it used, so you can tell what a given PDF was built with:
 Source date  1789898400 (2026-09-20 10:00:00 UTC, from git)
 ```
 
+The archive is pinned the same way: `paperkit zip` stores the build
+timestamp on every entry rather than the files' own modification times, which
+git does not restore, and keeps only the executable bit of each mode. The same
+sources therefore archive to the same bytes from a fresh clone, on another
+machine.
+
 The trailer `/ID` needs help on older toolchains: from TeX Live 2024 on,
 xdvipdfmx derives it from the epoch, but earlier versions do not, so paperkit
 pins it from the epoch and the main's name (each main of a project gets its

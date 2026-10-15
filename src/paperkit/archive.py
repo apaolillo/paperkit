@@ -3,12 +3,17 @@
 
 """Submission zip creation."""
 
+import datetime as dt
 import fnmatch
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from paperkit import reproducible
 from paperkit.config import PaperkitConfig
+
+# Zip stores DOS timestamps, which cannot predate 1980.
+_DOS_EPOCH = dt.datetime(1980, 1, 1, tzinfo=dt.UTC)
 
 
 def _expand_pattern(root: Path, pattern: str) -> list[Path]:
@@ -123,15 +128,40 @@ def create_zip(config: PaperkitConfig, include_bbl: bool | None = None) -> ZipRe
     wanted = config.zip.include_bbl if include_bbl is None else include_bbl
     bbl_entries, warnings = _bbl_entries(config, files) if wanted else ({}, [])
 
+    # Entry metadata is normalized to the build timestamp, so the same sources
+    # archive to the same bytes on another machine or a fresh clone, where the
+    # files' own mtimes differ.
+    source_date = reproducible.resolve(config.source_date_epoch, root)
+    entries = {str(f.relative_to(root)): f for f in files}
+    entries.update(bbl_entries)
+
     zip_path.unlink(missing_ok=True)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for f in sorted(files):
-            arcname = f.relative_to(root)
-            zf.write(f, arcname)
-        for arcname_str, source in sorted(bbl_entries.items()):
-            zf.write(source, arcname_str)
+        for arcname in sorted(entries):
+            zf.writestr(
+                _entry_info(arcname, entries[arcname], source_date), entries[arcname].read_bytes()
+            )
 
     return ZipResult(zip_path, warnings)
+
+
+def _entry_info(
+    arcname: str, source: Path, source_date: reproducible.SourceDate
+) -> zipfile.ZipInfo:
+    """Zip entry whose metadata depends on the sources, not on this machine.
+
+    The timestamp is the build timestamp rather than the file's mtime (git
+    does not restore mtimes, so a fresh clone would archive differently), and
+    the mode keeps only the executable bit. The zip format stores DOS times,
+    which start in 1980 and have two-second resolution.
+    """
+    stamp = max(dt.datetime.fromtimestamp(source_date.epoch, dt.UTC), _DOS_EPOCH)
+    info = zipfile.ZipInfo(arcname, date_time=stamp.timetuple()[:6])
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.create_system = 3  # Unix, whatever the host
+    executable = source.stat().st_mode & 0o111
+    info.external_attr = (0o755 if executable else 0o644) << 16
+    return info
 
 
 def print_zip_summary(zip_path: Path) -> None:

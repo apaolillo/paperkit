@@ -177,3 +177,38 @@ def test_cli_shows_the_staleness_warning(tmp_path: Path, monkeypatch: pytest.Mon
     assert result.exit_code == 0
     assert "warning:" in result.output
     assert "paper.bbl" in result.output  # also listed in the summary
+
+
+# -- reproducibility -----------------------------------------------------------------
+
+
+def test_same_sources_archive_to_the_same_bytes(tmp_path: Path) -> None:
+    # Mtimes differ between clones, so they must not reach the archive.
+    cfg = _project(tmp_path, ["paper"])
+    cfg.zip.include_bbl = True
+    cfg.source_date_epoch = 1789898400
+    first = archive.create_zip(cfg).path.read_bytes()
+
+    for name in ("paper.tex", "refs.bib", "out/paper/paper.bbl"):
+        _age(tmp_path / name, -3600)  # as if just checked out
+    assert archive.create_zip(cfg).path.read_bytes() == first
+
+
+def test_entry_timestamps_come_from_the_build_timestamp(tmp_path: Path) -> None:
+    cfg = _project(tmp_path, ["paper"])
+    cfg.source_date_epoch = 1789898400  # 2026-09-20 10:00:00 UTC
+    with zipfile.ZipFile(archive.create_zip(cfg).path) as zf:
+        assert {i.date_time for i in zf.infolist()} == {(2026, 9, 20, 10, 0, 0)}
+        assert {i.create_system for i in zf.infolist()} == {3}
+
+
+def test_the_executable_bit_survives_but_other_mode_bits_do_not(tmp_path: Path) -> None:
+    cfg = _project(tmp_path, ["paper"])
+    cfg.zip.include = ["{main}.tex", "build.sh"]
+    script = tmp_path / "build.sh"
+    script.write_text("#!/bin/sh\necho hi\n")
+    script.chmod(0o777)
+    (tmp_path / "paper.tex").chmod(0o640)
+    with zipfile.ZipFile(archive.create_zip(cfg).path) as zf:
+        modes = {i.filename: i.external_attr >> 16 for i in zf.infolist()}
+    assert modes == {"build.sh": 0o755, "paper.tex": 0o644}

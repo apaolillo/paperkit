@@ -38,7 +38,8 @@ First public release.
   trailer id is pinned too where the toolchain does not derive it from that
   timestamp. `[build] source_date_epoch` takes an epoch, an ISO date, or
   "git" (default: HEAD's committer date), and the report shows the timestamp
-  used.
+  used. The submission archive is pinned to the same timestamp, so the same
+  sources zip to the same bytes from a fresh clone.
 - `paperkit zip`: submission archive with configurable include and exclude
   patterns. `[zip] include_bbl` (or `--bbl`) also ships each main's compiled
   bibliography next to its .tex, for publishers that compile the sources
