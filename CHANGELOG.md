@@ -40,7 +40,10 @@ First public release.
   "git" (default: HEAD's committer date), and the report shows the timestamp
   used.
 - `paperkit zip`: submission archive with configurable include and exclude
-  patterns.
+  patterns. `[zip] include_bbl` (or `--bbl`) also ships each main's compiled
+  bibliography next to its .tex, for publishers that compile the sources
+  without running BibTeX; it refuses to build an archive whose .bbl is
+  missing and warns when one is older than its sources.
 - Plain-text title and abstract exported next to each PDF, for pasting into
   submission forms. `\input`/`\include` files are resolved in Python, so no
   latexpand is needed, and a skipped export says why instead of staying

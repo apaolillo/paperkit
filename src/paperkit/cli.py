@@ -333,16 +333,31 @@ def _check_host(config: PaperkitConfig, targets: list[str]) -> None:
 
 
 @main.command(name="zip")
+@click.option(
+    "--bbl/--no-bbl",
+    default=None,
+    help="Include each main's compiled bibliography (default: [zip] include_bbl)",
+)
 @click.pass_context
-def zip_cmd(ctx: click.Context) -> None:
-    """Create submission archive."""
+def zip_cmd(ctx: click.Context, bbl: bool | None) -> None:
+    """Create submission archive.
+
+    --bbl adds <main>.bbl next to <main>.tex, for publishers that compile the
+    sources without running BibTeX. The build output must be up to date.
+    """
     config = _get_config(ctx)
 
-    from paperkit.archive import create_zip, print_zip_summary
+    from paperkit.archive import MissingBblError, create_zip, print_zip_summary
 
     click.echo(_header("\U0001f4e6 Creating submission archive ..."))
-    zip_path = create_zip(config)
-    print_zip_summary(zip_path)
+    try:
+        result = create_zip(config, include_bbl=bbl)
+    except MissingBblError as e:
+        click.echo(f"  {e}", err=True)
+        sys.exit(1)
+    for warning in result.warnings:
+        click.echo(f"  {_DIM}warning: {warning}{_RESET}")
+    print_zip_summary(result.path)
 
 
 @main.command()
@@ -497,6 +512,9 @@ include = [
     "content/*.tex",
 ]
 exclude = ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
+# Ship each main's compiled bibliography (<main>.bbl) next to its .tex, for
+# publishers that compile without running BibTeX (e.g. Springer LNCS).
+include_bbl = false
 
 [profile]
 name = "{profile}"

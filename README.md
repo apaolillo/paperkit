@@ -109,6 +109,7 @@ include = [
     "content/references.bib",
 ]
 exclude = ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
+include_bbl = false         # also ship each main's compiled bibliography
 
 [profile]
 name = "base"               # base | acm
@@ -124,7 +125,7 @@ name = "base"               # base | acm
 | `paperkit check [NAMES]` | Run checks on existing build output (Docker by default) |
 | `paperkit check --no-docker` | Run checks with the host's tools |
 | `paperkit bibtidy` | Run bibtex-tidy on the bib file (in-place); `--no-sort` keeps the entry and field order |
-| `paperkit zip` | Create submission archive |
+| `paperkit zip` | Create submission archive; `--bbl` adds the compiled bibliographies |
 | `paperkit init` | Generate a `.paperkit.toml` template |
 
 Global options: `--config PATH` (config file), `-v/--verbose` (show Docker commands).
@@ -186,6 +187,15 @@ passes silently. `paperkit check` runs in the Docker image by default, where
 all tools are installed; `--no-docker` uses the host's. The TeX Live line of
 the report comes from the build log, i.e. it names the engine that produced
 the PDF, wherever the report is generated.
+
+**Shipping the compiled bibliography.** Publishers often compile a submission
+without running BibTeX, and ask for the `.bbl` alongside the sources (Springer's
+LNCS checklist, for instance). `include_bbl = true`, or `paperkit zip --bbl`,
+copies each included main's `<main>.bbl` out of the build directory and stores
+it next to its `.tex` in the archive, which is where a publisher looks for it.
+Build first: if a `.bbl` is missing the command stops and says so rather than
+shipping an archive that cannot be compiled, and if a `.bbl` is older than its
+`.tex` or the bib file, it warns that the archive may not match the sources.
 
 ## Profiles
 

@@ -88,6 +88,10 @@ class TexliveConfig:
 class ZipConfig:
     name: str = ""
     include: list[str] = field(default_factory=list)
+    # Add each included main's compiled bibliography (<main>.bbl, from the
+    # build directory) next to its .tex. Publishers that compile without
+    # running BibTeX need it; Springer's LNCS checklist asks for it.
+    include_bbl: bool = False
     exclude: list[str] = field(
         default_factory=lambda: ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"],
     )
@@ -419,6 +423,10 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
         z.include = zip_raw["include"]
     if "exclude" in zip_raw:
         z.exclude = zip_raw["exclude"]
+    if "include_bbl" in zip_raw:
+        if not isinstance(zip_raw["include_bbl"], bool):
+            raise ValueError("[zip] include_bbl: expected true or false")
+        z.include_bbl = zip_raw["include_bbl"]
     cfg.zip = z
 
     # [profile]
