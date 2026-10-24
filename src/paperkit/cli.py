@@ -13,7 +13,7 @@ from pathlib import Path
 
 import click
 
-from paperkit import reproducible
+from paperkit import reproducible, texlive
 from paperkit.config import PaperkitConfig, load_config
 
 # ANSI
@@ -46,6 +46,13 @@ def main(ctx: click.Context, config_path: Path | None, verbose: bool) -> None:
 
 def _get_config(ctx: click.Context) -> PaperkitConfig:
     return load_config(ctx.obj.get("config_path"))
+
+
+def _config_path(ctx: click.Context) -> Path:
+    """The .paperkit.toml in use, for commands that edit it."""
+    from paperkit.config import find_config
+
+    return ctx.obj.get("config_path") or find_config()
 
 
 def _default_jobs() -> int:
@@ -455,9 +462,76 @@ def _tidy_docker(config: PaperkitConfig, verbose: bool = False) -> None:
         sys.exit(rc)
 
 
+@main.command(name="texlive-update")
+@click.option("--check", is_flag=True, help="Report the newest snapshot without editing the config")
+@click.pass_context
+def texlive_update(ctx: click.Context, check: bool) -> None:
+    """Move [texlive] to the newest dated snapshot.
+
+    Queries the snapshot archive, then rewrites `snapshot` and `tlpdb_sha512`
+    in .paperkit.toml, leaving the rest of the file untouched. This is the
+    only command that looks things up online; builds never do.
+    """
+    config_path = _config_path(ctx)
+    click.echo(_header("\U0001f4c5 Looking up the newest TeX Live snapshot ..."))
+    newest = texlive.latest_snapshot()
+    if newest is None:
+        click.echo("  no snapshot found (is the archive reachable?)", err=True)
+        sys.exit(1)
+    snapshot, digest = newest
+
+    text = config_path.read_text()
+    try:
+        updated, previous = texlive.update_config_text(text, snapshot, digest)
+    except ValueError as e:
+        click.echo(f"  {e}", err=True)
+        sys.exit(1)
+
+    current = previous.get("snapshot", "")
+    if current == snapshot:
+        click.echo(f"  already on the newest snapshot ({snapshot})")
+        return
+    click.echo(f"  {current or 'unset'} -> {snapshot}")
+    click.echo(f"  {_DIM}tlpdb_sha512 {digest}{_RESET}")
+    if check:
+        click.echo(f"  {_DIM}--check: {config_path.name} not modified{_RESET}")
+        return
+    config_path.write_text(updated)
+    click.echo(f"  {_BOLD}\u2705 {config_path.name} updated{_RESET}; rebuild to pick it up")
+
+
+def _texlive_block(mode: str) -> str:
+    """The [texlive] section `paperkit init` writes."""
+    if mode == "distro":
+        return """# TeX Live comes from the base image's texlive-* packages. Note that the
+# distro minted and latexminted do not work together on ubuntu:26.04; switch
+# to the snapshot below if you use minted.
+[texlive]
+source = "distro"
+"""
+    collections = ", ".join(f'"{c}"' for c in texlive.DEFAULT_COLLECTIONS)
+    return f"""# TeX Live from a dated upstream snapshot: the same package set on every
+# image rebuild, and a working minted. `paperkit texlive-update` moves this
+# to a newer snapshot; `source = "distro"` uses the base image's packages.
+[texlive]
+source = "upstream"
+snapshot = "{texlive.KNOWN_GOOD_SNAPSHOT}"
+tlpdb_sha512 = "{texlive.KNOWN_GOOD_TLPDB_SHA512}"
+scheme = "{texlive.DEFAULT_SCHEME}"
+collections = [{collections}]
+"""
+
+
 @main.command()
 @click.option("--profile", default="acm", help="Profile to use (default: acm)")
-def init(profile: str) -> None:
+@click.option(
+    "--texlive",
+    "texlive_mode",
+    type=click.Choice(["snapshot", "distro"]),
+    default="snapshot",
+    help="TeX Live source for the new project (default: snapshot)",
+)
+def init(profile: str, texlive_mode: str) -> None:
     """Generate a .paperkit.toml template."""
     template = f"""[project]
 main = "main"                              # main .tex file (without extension)
@@ -476,14 +550,7 @@ base_image = "ubuntu:26.04"
 image_name = "paper-builder"
 extra_packages = []
 
-# TeX Live from a dated upstream snapshot instead of the distro packages, for
-# identical rebuilds (see README, "TeX Live from a dated snapshot").
-# [texlive]
-# source = "upstream"
-# snapshot = "YYYY-MM-DD"
-# scheme = "small"
-# collections = ["latexextra", "fontsrecommended", "fontsextra", "bibtexextra"]
-
+{_texlive_block(texlive_mode)}
 [checks]
 non_ascii = true
 trailing_whitespace = true

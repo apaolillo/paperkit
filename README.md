@@ -126,7 +126,8 @@ name = "base"               # base | acm
 | `paperkit check --no-docker` | Run checks with the host's tools |
 | `paperkit bibtidy` | Run bibtex-tidy on the bib file (in-place); `--no-sort` keeps the entry and field order |
 | `paperkit zip` | Create submission archive; `--bbl` adds the compiled bibliographies |
-| `paperkit init` | Generate a `.paperkit.toml` template |
+| `paperkit init` | Generate a `.paperkit.toml` template (`--texlive distro` for the base image's packages) |
+| `paperkit texlive-update` | Move `[texlive]` to the newest dated snapshot (`--check` to only report) |
 
 Global options: `--config PATH` (config file), `-v/--verbose` (show Docker commands).
 
@@ -251,11 +252,16 @@ command line.
 
 ### TeX Live from a dated snapshot
 
-By default TeX Live comes from the base image's `texlive-*` packages, so its
-version is whatever the distribution ships, and it changes (or disappears) as
-the distribution moves on. With `source = "upstream"`, paperkit instead runs
-the official `install-tl` against a tlnet repository. Pointing it at a dated
-snapshot gives the same TeX Live package set on every image rebuild:
+`paperkit init` writes a `[texlive]` section pinned to a dated snapshot that
+this release was tested against, so a new project gets a reproducible TeX
+Live and a working `minted` without any network lookup at init time. Use
+`paperkit init --texlive distro` for the base image's `texlive-*` packages
+instead, which is whatever the distribution ships and changes (or disappears)
+as it moves on.
+
+With `source = "upstream"` paperkit runs the official `install-tl` against a
+tlnet repository, and a dated snapshot gives the same package set on every
+image rebuild:
 
 ```toml
 [texlive]
@@ -321,8 +327,12 @@ unavailable, use `year = ...` for a closed release (the TUG historic archive is
 mirrored), or keep a copy of the snapshot on your own server and set
 `repository`.
 
-**Bumping.** Change `snapshot`, update `tlpdb_sha512` (command above), rebuild,
-and diff the output PDF against the previous build.
+**Bumping.** `paperkit texlive-update` looks up the newest published snapshot,
+rewrites `snapshot` and `tlpdb_sha512` in `.paperkit.toml` and leaves the rest
+of the file alone; `--check` reports the move without editing. It is the only
+command that goes online: builds never do. Rebuild afterwards and diff the
+output PDF against the previous build. To move by hand, change `snapshot` and
+update `tlpdb_sha512` with the command above.
 
 ## Development
 

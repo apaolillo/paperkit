@@ -12,10 +12,13 @@ release) makes every image rebuild install the same package set.
 import datetime as dt
 import re
 import shlex
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from paperkit.config import TexliveConfig
+
+_SHA512_HEX = re.compile(r"[0-9a-f]{128}")
 
 # Daily archive of the full tlnet repository.
 SNAPSHOT_BASE = "https://www.texlive.info/tlnet-archive"
@@ -24,6 +27,28 @@ SNAPSHOT_BASE = "https://www.texlive.info/tlnet-archive"
 HISTORIC_BASE = "https://ftp.math.utah.edu/pub/tex/historic/systems/texlive"
 # CTAN redirector to a nearby mirror of the current release. Not reproducible.
 LIVE_REPOSITORY = "https://mirror.ctan.org/systems/texlive/tlnet"
+
+# Snapshot `paperkit init` proposes: a dated repository this release was
+# tested against, so a new project is reproducible without a network lookup
+# at init time. Bumped per release; `paperkit texlive-update` moves a project
+# to a newer one.
+KNOWN_GOOD_SNAPSHOT = "2026-10-22"
+KNOWN_GOOD_TLPDB_SHA512 = (
+    "f336dd94d49ed76337fb4a5b3c7614e6072c46c6c956692d40019c5879e62acf"
+    "2c928fd9bc72863eb8874f6e8654e9e529a18271c7c27de4dd69e7a0299c97ca"
+)
+# Enough for a typical paper: the classes publishers use, their fonts, and
+# the usual maths, graphics and bibliography packages.
+DEFAULT_SCHEME = "small"
+DEFAULT_COLLECTIONS = (
+    "latexextra",
+    "fontsrecommended",
+    "fontsextra",
+    "publishers",
+    "mathscience",
+    "pictures",
+    "bibtexextra",
+)
 
 # Fixed install root, so PATH does not depend on the release year.
 TEXDIR = "/opt/texlive"
@@ -69,6 +94,77 @@ def describe(tl: TexliveConfig) -> str:
     if tl.year is not None:
         return f"upstream, TeX Live {tl.year} final"
     return "upstream, live CTAN (not pinned)"
+
+
+# How far back to look for the newest published snapshot: the archive is
+# daily, so a handful of days covers any gap in its publishing.
+_SNAPSHOT_LOOKBACK_DAYS = 10
+_SNAPSHOT_RE = re.compile(r"(?m)^(?P<key>\s*snapshot\s*=\s*)(?P<value>.+?)\s*$")
+_TLPDB_RE = re.compile(r"(?m)^(?P<key>\s*tlpdb_sha512\s*=\s*)(?P<value>.+?)\s*$")
+
+
+def snapshot_url(snapshot: str) -> str:
+    return f"{SNAPSHOT_BASE}/{snapshot.replace('-', '/')}/tlnet"
+
+
+def fetch_tlpdb_sha512(snapshot: str) -> str | None:
+    """Checksum of a snapshot's package database, or None if it has none."""
+    proc = subprocess.run(
+        [
+            "curl",
+            "-fsSL",
+            "--max-time",
+            "30",
+            f"{snapshot_url(snapshot)}/tlpkg/texlive.tlpdb.sha512",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    digest = proc.stdout.split(" ", 1)[0].strip().lower()
+    return digest if _SHA512_HEX.fullmatch(digest) else None
+
+
+def latest_snapshot(today: dt.date | None = None) -> tuple[str, str] | None:
+    """Newest published snapshot and its checksum, searching back from *today*."""
+    day = today or dt.datetime.now(dt.UTC).date()
+    for back in range(_SNAPSHOT_LOOKBACK_DAYS):
+        candidate = (day - dt.timedelta(days=back)).isoformat()
+        digest = fetch_tlpdb_sha512(candidate)
+        if digest:
+            return candidate, digest
+    return None
+
+
+def update_config_text(text: str, snapshot: str, digest: str) -> tuple[str, dict[str, str]]:
+    """Rewrite the snapshot and checksum in a .paperkit.toml, keeping comments.
+
+    Returns the new text and the replaced values, so the caller can report
+    what moved. Raises ValueError when there is nothing to update.
+    """
+    if "[texlive]" not in text:
+        raise ValueError("no [texlive] section: run `paperkit init` or add one")
+    if not _SNAPSHOT_RE.search(text):
+        raise ValueError("no snapshot key in [texlive]: this project does not pin one")
+
+    previous: dict[str, str] = {}
+
+    def _snapshot(m: re.Match[str]) -> str:
+        previous["snapshot"] = m.group("value").strip('"')
+        return f'{m.group("key")}"{snapshot}"'
+
+    def _digest(m: re.Match[str]) -> str:
+        previous["tlpdb_sha512"] = m.group("value").strip('"')
+        return f'{m.group("key")}"{digest}"'
+
+    text = _SNAPSHOT_RE.sub(_snapshot, text, count=1)
+    if _TLPDB_RE.search(text):
+        text = _TLPDB_RE.sub(_digest, text, count=1)
+    else:
+        # Keep the pin next to the snapshot it belongs to.
+        text = _SNAPSHOT_RE.sub(lambda m: f'{m.group(0)}\ntlpdb_sha512 = "{digest}"', text, count=1)
+    return text, previous
 
 
 def install_profile(tl: TexliveConfig) -> str:

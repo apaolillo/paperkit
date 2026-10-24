@@ -49,4 +49,9 @@ First public release.
   submission forms. `\input`/`\include` files are resolved in Python, so no
   latexpand is needed, and a skipped export says why instead of staying
   silent.
-- `paperkit shell` and `paperkit init`, and `base` and `acm` profiles.
+- `paperkit shell`, and `base` and `acm` profiles.
+- `paperkit init` pins a dated TeX Live snapshot that the release was tested
+  against, so a new project is reproducible and `minted` works out of the box;
+  `--texlive distro` keeps the base image's packages. `paperkit texlive-update`
+  moves a project to the newest published snapshot (`--check` to only report),
+  and is the only command that uses the network.
