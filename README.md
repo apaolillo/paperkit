@@ -350,5 +350,7 @@ uv run mypy src              # type checking
 uv run pytest                # tests
 ```
 
-Releases follow [RELEASING.md](RELEASING.md); changes are listed in
+Patches are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) covers the checks a
+pull request is expected to pass and the sign-off it carries. Releases follow
+[RELEASING.md](RELEASING.md); changes are listed in
 [CHANGELOG.md](CHANGELOG.md).
