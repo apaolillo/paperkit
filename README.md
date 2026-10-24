@@ -65,7 +65,10 @@ paperkit zip
 
 ## Configuration
 
-paperkit looks for `.paperkit.toml` in the current directory or any parent. Example:
+paperkit looks for `.paperkit.toml` in the current directory or any parent.
+Every key is optional; the example below shows the common ones, and the
+[configuration reference](https://github.com/apaolillo/paperkit/blob/main/docs/configuration.md)
+documents every section and key with its default.
 
 ```toml
 [project]
@@ -135,6 +138,10 @@ name = "base"               # base | acm
 Global options: `--config PATH` (config file), `-v/--verbose` (show Docker commands), `-V/--version`.
 
 ## Checks
+
+What each check catches, when it is skipped rather than run, and how to
+narrow one instead of switching it off: the
+[checks reference](https://github.com/apaolillo/paperkit/blob/main/docs/checks.md).
 
 | Check | What it does |
 |---|---|
@@ -351,6 +358,9 @@ uv run ruff format src tests # formatting
 uv run mypy src              # type checking
 uv run pytest                # tests
 ```
+
+Documentation lives in [docs/](docs/): the configuration reference and the
+checks reference.
 
 Patches are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) covers the checks a
 pull request is expected to pass and the sign-off it carries. Releases follow
