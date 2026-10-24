@@ -362,7 +362,13 @@ uv run ruff check src tests  # linting (--fix applies the safe fixes)
 uv run ruff format src tests # formatting
 uv run mypy src              # type checking
 uv run pytest                # tests
+
+./scripts/build_fixtures.sh --docker   # real builds of tests/papers, through the image
 ```
+
+The unit suite needs no TeX and runs in a second. The fixture papers are the
+only thing that exercises a real build; CI runs them weekly and when the
+build-related code changes, since they install a TeX Live.
 
 Documentation lives in [docs/](docs/): the configuration reference and the
 checks reference.

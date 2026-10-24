@@ -14,3 +14,4 @@ tests/papers/*/out/
 tests/papers/*/*.pdf
 
 tests/papers/*/build.out
+tests/papers/*/*.bib.original

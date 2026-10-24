@@ -34,6 +34,16 @@ CI runs the same script as `./scripts/all_checks.sh --check` on Python 3.12,
 3.13 and 3.14. In that mode nothing is rewritten and an unformatted file is
 an error, so run the suite locally before pushing.
 
+A change to the build itself, in `builder.py`, `docker.py`, `texlive.py` or
+a profile, is not covered by the unit suite, which never runs an engine. For
+those, build the fixture papers too:
+
+```bash
+./scripts/build_fixtures.sh --docker   # or without the flag, on a host with TeX
+```
+
+CI does the same on pull requests that touch those files, and weekly.
+
 What the suite does not check, but reviewers will:
 
 - **Tests.** New behaviour comes with a test. The suite runs in about a

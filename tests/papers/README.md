@@ -19,9 +19,13 @@ a paper of 2 pages. None of that is an error, so `paperkit build` exits 0 and
 Build them all and check those outcomes:
 
 ```bash
-./scripts/build_fixtures.sh            # needs TeX: run it in `paperkit shell`
-PAPERKIT=.venv/bin/paperkit ./scripts/build_fixtures.sh
+./scripts/build_fixtures.sh --docker   # through the image, needs only Docker
+./scripts/build_fixtures.sh            # on this host, needs a TeX installation
+PAPERKIT=.venv/bin/paperkit ./scripts/build_fixtures.sh --docker
 ```
+
+The `fixtures` workflow runs the Docker form weekly, on demand, and whenever
+the build-related code or these papers change.
 
 The unit suite never builds them, since it must run without TeX; it only
 loads their configuration files. Build output stays out of git.

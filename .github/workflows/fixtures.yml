@@ -1,0 +1,60 @@
+name: fixtures
+
+# The unit suite never runs an engine. This job does: it builds the Docker
+# image and puts the fixture papers through it the way a user's builds go.
+# It installs a TeX Live, so it does not run on every push: on a schedule,
+# on demand, and when the files that only a real build can validate change.
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays, 06:17 UTC
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/paperkit/builder.py"
+      - "src/paperkit/docker.py"
+      - "src/paperkit/texlive.py"
+      - "src/paperkit/profiles/**"
+      - "tests/papers/**"
+      - "scripts/build_fixtures.sh"
+      - ".github/workflows/fixtures.yml"
+  pull_request:
+    paths:
+      - "src/paperkit/builder.py"
+      - "src/paperkit/docker.py"
+      - "src/paperkit/texlive.py"
+      - "src/paperkit/profiles/**"
+      - "tests/papers/**"
+      - "scripts/build_fixtures.sh"
+      - ".github/workflows/fixtures.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fixtures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixtures:
+    name: build the fixture papers in Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - name: Install paperkit from this checkout
+        run: uv sync --locked
+      - name: Build the fixtures through the image
+        # The image is composed from the fixtures' config and holds this
+        # checkout's paperkit, so this is the whole path a user takes.
+        run: PAPERKIT=.venv/bin/paperkit ./scripts/build_fixtures.sh --docker
+      - name: Keep the build reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fixture-build-reports
+          path: tests/papers/*/build.out
+          if-no-files-found: ignore
