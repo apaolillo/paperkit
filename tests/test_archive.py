@@ -25,6 +25,11 @@ def _project(tmp_path: Path, mains: list[str], include: list[str] | None = None)
         out.mkdir(parents=True)
         (out / f"{main}.bbl").write_text(BBL)
     (tmp_path / "refs.bib").write_text("@misc{a, title={A}}\n")
+    # Backdate the sources so every .bbl here is unambiguously fresh: mtimes
+    # are coarsened to the timer tick, so writing them in order leaves the
+    # .bbl newer only most of the time.
+    for source in [*(tmp_path / f"{main}.tex" for main in mains), tmp_path / "refs.bib"]:
+        _age(source, 10)
     cfg = PaperkitConfig(root=tmp_path, main=mains[0], mains=list(mains), bib="refs.bib")
     cfg.zip.name = mains[0]
     cfg.zip.include = include if include is not None else ["{main}.tex", "refs.bib"]
