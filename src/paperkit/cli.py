@@ -13,7 +13,7 @@ from pathlib import Path
 
 import click
 
-from paperkit import reproducible, texlive
+from paperkit import __version__, reproducible, texlive
 from paperkit.config import PaperkitConfig, load_config
 
 # ANSI
@@ -28,6 +28,7 @@ def _header(msg: str) -> str:
 
 
 @click.group()
+@click.version_option(__version__, "-V", "--version", prog_name="paperkit")
 @click.option(
     "--config",
     "config_path",

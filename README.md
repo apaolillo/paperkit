@@ -129,7 +129,7 @@ name = "base"               # base | acm
 | `paperkit init` | Generate a `.paperkit.toml` template (`--texlive distro` for the base image's packages) |
 | `paperkit texlive-update` | Move `[texlive]` to the newest dated snapshot (`--check` to only report) |
 
-Global options: `--config PATH` (config file), `-v/--verbose` (show Docker commands).
+Global options: `--config PATH` (config file), `-v/--verbose` (show Docker commands), `-V/--version`.
 
 ## Checks
 
