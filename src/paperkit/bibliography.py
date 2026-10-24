@@ -166,17 +166,22 @@ def draft_usage(config: PaperkitConfig, name: str) -> TargetUsage | None:
     """Citations of *name* from one draft LaTeX pass into a scratch directory.
 
     No PDF is written (shell-escape tools such as minted still run), and the
-    real output directory is not touched. None if the pass fails.
+    real output directory is not touched. None if the pass fails, including
+    when the engine is not installed: the check is advisory, so a host
+    without TeX reports "not checked" rather than failing the run.
     """
     flag = "-no-pdf" if config.engine == "xelatex" else "-draftmode"
     with tempfile.TemporaryDirectory(prefix=f"paperkit-draft-{name}-") as tmp:
-        rc = run_latex(
-            config.engine,
-            config.root / f"{name}.tex",
-            Path(tmp),
-            shell_escape=config.shell_escape,
-            extra_args=[flag],
-        )
+        try:
+            rc = run_latex(
+                config.engine,
+                config.root / f"{name}.tex",
+                Path(tmp),
+                shell_escape=config.shell_escape,
+                extra_args=[flag],
+            )
+        except FileNotFoundError:
+            return None
         if rc != 0:
             return None
         return usage_from_dir(config, name, Path(tmp), "draft pass")

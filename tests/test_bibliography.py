@@ -192,10 +192,17 @@ def test_single_main_keeps_legacy_wording(tmp_path: Path) -> None:
 
 def test_single_main_without_aux_is_skipped(tmp_path: Path) -> None:
     cfg = _project(tmp_path, ["paper"])
+    cfg.checks.unused_bib.draft_pass = False  # keep the suite free of real engine runs
     outputs = {"paper": BuildResult(output_dir=tmp_path / "out" / "paper", success=True)}
     [result] = _unused(bib.project_bib_checks(cfg, outputs, focus=["paper"]))
     assert result.status == CheckStatus.CLEAN
     assert result.messages == ["Skipped (aux or bib file not found)"]
+
+
+def test_draft_pass_without_the_engine_installed(tmp_path: Path) -> None:
+    cfg = _project(tmp_path, ["paper"])
+    cfg.engine = "pdflatex-that-is-not-installed"
+    assert bib.draft_usage(cfg, "paper") is None
 
 
 def test_configured_bib_not_declared_is_checked_against_focus(tmp_path: Path) -> None:
