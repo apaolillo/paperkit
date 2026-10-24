@@ -1,5 +1,8 @@
 # paperkit
 
+[![checks](https://github.com/apaolillo/paperkit/actions/workflows/checks.yml/badge.svg)](https://github.com/apaolillo/paperkit/actions/workflows/checks.yml)
+[![PyPI](https://img.shields.io/pypi/v/paperkit)](https://pypi.org/project/paperkit/)
+
 Reproducible builds and pre-submission checks for research papers. paperkit
 builds your paper in a container composed from a config file, then checks it
 for the problems that get submissions desk-rejected or camera-ready PDFs

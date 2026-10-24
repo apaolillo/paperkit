@@ -30,6 +30,10 @@ It verifies the copyright headers, formats the code, lints it, type-checks it
 and runs the tests. The formatter rewrites files in place, so check
 `git status` afterwards and include anything it changed.
 
+CI runs the same script as `./scripts/all_checks.sh --check` on Python 3.12,
+3.13 and 3.14. In that mode nothing is rewritten and an unformatted file is
+an error, so run the suite locally before pushing.
+
 What the suite does not check, but reviewers will:
 
 - **Tests.** New behaviour comes with a test. The suite runs in about a

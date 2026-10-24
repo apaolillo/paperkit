@@ -7,7 +7,7 @@ Prereqs:
 - `CHANGELOG.md` follows Keep a Changelog and Semantic Versioning.
 - The version is maintained manually (PEP 440) in one place:
   `__version__` in `src/paperkit/__init__.py` (`pyproject.toml` reads it).
-- `./scripts/all_checks.sh` passes on `main` (and CI is green, once set up).
+- `./scripts/all_checks.sh` passes on `main`, and the checks workflow is green.
 - [uv](https://docs.astral.sh/uv/) is installed.
 
 Versioning Tag format: `v0.X.Y`
