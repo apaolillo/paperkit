@@ -217,7 +217,7 @@ shipping an archive that cannot be compiled, and if a `.bbl` is older than its
 
 **`base`**: sensible defaults for any paper. With `sort = false` the two
 reordering arguments (`--sort=key`, `--sort-fields`) are dropped and the rest
-still applies. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
+still applies. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --no-escape --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
 
 **`acm`**: for ACM conferences and journals. Currently identical to base; reserved for future ACM-specific defaults.
 

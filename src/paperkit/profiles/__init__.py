@@ -44,7 +44,18 @@ def register_profile(name: str, cls: type[BaseProfile]) -> None:
 
 
 def get_profile(config: PaperkitConfig) -> BaseProfile:
-    cls = _PROFILES.get(config.profile_name, BaseProfile)
+    """The profile `[profile] name` selects; a name nobody registered is an error.
+
+    Falling back to the base profile here would turn a typo into a silently
+    different build.
+    """
+    try:
+        cls = _PROFILES[config.profile_name]
+    except KeyError:
+        known = ", ".join(sorted(_PROFILES))
+        raise ValueError(
+            f"[profile] name: unknown profile {config.profile_name!r} (expected one of: {known})",
+        ) from None
     return cls()
 
 

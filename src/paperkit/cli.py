@@ -46,7 +46,20 @@ def main(ctx: click.Context, config_path: Path | None, verbose: bool) -> None:
 
 
 def _get_config(ctx: click.Context) -> PaperkitConfig:
-    return load_config(ctx.obj.get("config_path"))
+    """Load the project config, or exit with the problem rather than a traceback.
+
+    The profile is resolved here too, so a wrong `[profile] name` fails every
+    command up front instead of the first one that happens to need it.
+    """
+    from paperkit.profiles import get_profile
+
+    try:
+        config = load_config(ctx.obj.get("config_path"))
+        get_profile(config)
+    except (ValueError, FileNotFoundError) as e:
+        click.echo(f"error: {e}", err=True)
+        sys.exit(1)
+    return config
 
 
 def _config_path(ctx: click.Context) -> Path:

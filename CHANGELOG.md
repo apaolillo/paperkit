@@ -15,10 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exited 0. Warnings and skipped checks still exit 0, and a page-limit overrun
   stays advisory.
 
+- A `[profile] name` that matches no profile is now an error naming the
+  known ones; it used to fall back silently to `base`.
+
 ### Added
 
 - `--strict` on `paperkit build` and `paperkit check`: warnings, skipped
   checks and page-limit overruns then fail the run too.
+
+### Fixed
+
+- A configuration error (an unknown `[texlive]` key, a bad snapshot date, a
+  glob matching no file, ...) is reported as a one-line message with exit
+  status 1 instead of a Python traceback.
 
 ## [0.1.0] - 2026-10-24
 
