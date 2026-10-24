@@ -8,3 +8,9 @@ dist/
 
 __pycache__/
 *.py[cod]
+
+# Build output of the fixture papers.
+tests/papers/*/out/
+tests/papers/*/*.pdf
+
+tests/papers/*/build.out

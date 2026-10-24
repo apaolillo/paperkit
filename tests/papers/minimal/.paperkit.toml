@@ -1,0 +1,11 @@
+# The smallest project paperkit can build: one file, no bibliography.
+[project]
+main = "paper"
+content_dirs = []
+
+[build]
+shell_escape = false
+bibtex = false
+
+[profile]
+name = "base"

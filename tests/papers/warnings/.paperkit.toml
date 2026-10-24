@@ -1,0 +1,17 @@
+# Trips every warning-level check, and nothing worse: `paperkit build` here
+# exits 0 and `paperkit build --strict` exits 1.
+[project]
+main = "paper"
+content_dirs = ["content"]
+bib = "refs.bib"
+
+[build]
+shell_escape = false
+bibtex = true
+
+[page_limits]
+total = 1
+before_refs = 1
+
+[profile]
+name = "base"
