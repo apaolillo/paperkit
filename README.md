@@ -30,7 +30,7 @@ the [roadmap](ROADMAP.md).
 
 ## Installation
 
-Requires Python 3.13+ and, for container builds, Docker.
+Requires Python 3.12+ and, for container builds, Docker.
 
 ```bash
 pip install paperkit
