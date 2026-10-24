@@ -38,8 +38,6 @@ paperkit = "paperkit.cli:main"
 # Development tools, installed by `uv sync` (not part of the published metadata).
 [dependency-groups]
 dev = [
-    "black>=25",
-    "isort>=6",
     "ruff<=0.13.0",
     "mypy<=1.18.1",
     "types-click<=7.1.8",
@@ -73,14 +71,6 @@ exclude = [
     "*.pyc",
     "/.git",
 ]
-
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-
-[tool.isort]
-profile = "black"
-line_length = 100
 
 [tool.ruff]
 line-length = 100

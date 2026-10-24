@@ -107,7 +107,7 @@ def print_report(
     print(verdict)
 
     # Log location
-    print(f"  {_styled(f"Logs: {build_result.output_dir}/*.log, *.blg", _DIM)}")
+    print(f"  {_styled(f'Logs: {build_result.output_dir}/*.log, *.blg', _DIM)}")
     print()
 
 

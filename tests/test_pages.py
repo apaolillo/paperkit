@@ -100,8 +100,7 @@ def test_flag_defaults_to_false() -> None:
 def test_config_reads_the_flag(tmp_path: Path) -> None:
     cfg_path = tmp_path / ".paperkit.toml"
     cfg_path.write_text(
-        '[project]\nmain = "p"\n\n[page_limits]\nbefore_refs = 14\n'
-        "ack_counts_as_content = true\n",
+        '[project]\nmain = "p"\n\n[page_limits]\nbefore_refs = 14\nack_counts_as_content = true\n',
     )
     limits = load_config(cfg_path).page_limits
     assert limits.ack_counts_as_content is True

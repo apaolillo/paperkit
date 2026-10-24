@@ -314,7 +314,7 @@ def check_non_ascii(config: PaperkitConfig) -> CheckResult:
         hits = []
         for i, line in enumerate(content.splitlines(), 1):
             if any(b > 127 for b in line):
-                hits.append(f"  {i}: {line.decode("utf-8", errors="replace")}")
+                hits.append(f"  {i}: {line.decode('utf-8', errors='replace')}")
         if hits:
             rel = tf.relative_to(config.root)
             bad_files.append((str(rel), hits))
@@ -512,7 +512,7 @@ def check_bibtex_tidy(config: PaperkitConfig) -> CheckResult:
         for line in tidy_proc.stdout.splitlines():
             if "DUPLICATE_ENTRY" in line:
                 result.status = CheckStatus.WARNING
-                result.messages.append(f"  {line.replace("DUPLICATE_ENTRY: ", "")}")
+                result.messages.append(f"  {line.replace('DUPLICATE_ENTRY: ', '')}")
     finally:
         tmp_path.unlink(missing_ok=True)
 

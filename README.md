@@ -343,9 +343,8 @@ development tools, so everyone formats and lints with the same versions.
 uv sync                      # create .venv with paperkit and the dev tools
 ./scripts/all_checks.sh      # headers, format, lint, types, tests (all below)
 
-uv run isort src tests       # formatting
-uv run black src tests
-uv run ruff check src tests  # linting
+uv run ruff check src tests  # linting (--fix applies the safe fixes)
+uv run ruff format src tests # formatting
 uv run mypy src              # type checking
 uv run pytest                # tests
 ```
