@@ -5,7 +5,7 @@ All notable changes to paperkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-10-24
 
 First public release.
 
@@ -31,7 +31,7 @@ First public release.
 - `paperkit bibtidy`: run bibtex-tidy on the bibliography in place.
   `--sort` / `--no-sort` chooses whether entries and fields are reordered;
   `[checks] bibtex_tidy.sort` sets the default for the command and the
-  tidiness check alike. `paperkit tidy` still works as a hidden alias.
+  tidiness check alike.
 - Byte-reproducible builds: every engine, bibtex and biber run is pinned to
   one timestamp (`SOURCE_DATE_EPOCH` and `FORCE_SOURCE_DATE`, forwarded into
   the container), which fixes the PDF dates and font subset tags, and the
@@ -47,9 +47,8 @@ First public release.
   missing and warns when one is older than its sources.
 - Plain-text title and abstract exported next to each PDF, for pasting into
   submission forms. `\input`/`\include` files are resolved in Python, so no
-  latexpand is needed, and a skipped export says why instead of staying
-  silent.
-- `paperkit shell`, and `base` and `acm` profiles.
+  extra tool is needed, and an export that cannot run says why.
+- `paperkit shell`, `paperkit -V/--version`, and `base` and `acm` profiles.
 - `paperkit init` pins a dated TeX Live snapshot that the release was tested
   against, so a new project is reproducible and `minted` works out of the box;
   `--texlive distro` keeps the base image's packages. `paperkit texlive-update`
