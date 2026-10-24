@@ -28,7 +28,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/apaolillo/paperkit"
+Repository = "https://github.com/apaolillo/paperkit"
 Issues = "https://github.com/apaolillo/paperkit/issues"
+Changelog = "https://github.com/apaolillo/paperkit/blob/main/CHANGELOG.md"
 
 [project.scripts]
 paperkit = "paperkit.cli:main"
