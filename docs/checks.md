@@ -23,9 +23,26 @@ The page-limit check is advisory: it prints in red when you are over, but it
 does not turn the verdict into "Build has errors", because being over the
 limit is a fact about the paper rather than a defect in the build.
 
-Note that the exit code follows the build, not the checks: `paperkit build`
-exits non-zero when a target fails to compile, and `paperkit check` exits
-non-zero only when it finds no output to check at all.
+## Exit status
+
+`paperkit build` and `paperkit check` exit with the verdict they printed:
+
+| Situation | Exit status |
+|---|---|
+| Everything clean | 0 |
+| Warnings or skipped checks | 0 |
+| Any error, or a target that produced no PDF | 1 |
+| Over a page limit | 0, since the page check is advisory |
+| Any of the above, with `--strict` | 1 unless everything is clean |
+
+The default is deliberately forgiving: a paper with three overfull boxes is
+still a paper you can submit, and failing on that trains people to ignore the
+exit status. `--strict` is for a paper repository's own CI, where a new
+warning, a check that could not run, or going over the limit should all stop
+the pipeline.
+
+The status travels out of the container, so `paperkit check` in Docker
+reports what the inner run found.
 
 ## The checks
 

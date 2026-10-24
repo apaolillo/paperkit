@@ -161,14 +161,36 @@ def _print_check_detail(cr: CheckResult) -> None:
 _WARNING_LEVEL = (CheckStatus.WARNING, CheckStatus.SKIPPED)
 
 
-def _worst_status(results: list[CheckResult]) -> CheckStatus:
-    """Worst verdict across results (CLEAN, WARNING or ERROR), ignoring advisory ones."""
-    binding = [cr for cr in results if not cr.advisory]
+def _worst_status(results: list[CheckResult], strict: bool = False) -> CheckStatus:
+    """Worst verdict across results (CLEAN, WARNING or ERROR).
+
+    Advisory results are excluded, so a paper over its page limit is shown in
+    red without turning the build into a failure, unless *strict* asks for
+    everything to count.
+    """
+    binding = results if strict else [cr for cr in results if not cr.advisory]
     if any(cr.status == CheckStatus.ERROR for cr in binding):
         return CheckStatus.ERROR
     if any(cr.status in _WARNING_LEVEL for cr in binding):
         return CheckStatus.WARNING
     return CheckStatus.CLEAN
+
+
+def exit_code(results: list[CheckResult], strict: bool = False, built: bool = True) -> int:
+    """The process exit status the report justifies.
+
+    1 when the report says the build has errors, or when no PDF was produced,
+    so a script sees what the reader sees. Warnings are a 0: a paper with
+    three overfull boxes is still a paper you can submit. With *strict* every
+    warning, skipped check and page-limit overrun counts as a failure too,
+    which is what a paper repository's own CI usually wants.
+    """
+    if not built:
+        return 1
+    worst = _worst_status(results, strict=strict)
+    if worst == CheckStatus.ERROR:
+        return 1
+    return 1 if strict and worst == CheckStatus.WARNING else 0
 
 
 def print_multi_summary(

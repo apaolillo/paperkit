@@ -5,6 +5,21 @@ All notable changes to paperkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `paperkit build` and `paperkit check` now exit 1 when the report says the
+  build has errors, matching the verdict they print; previously a build that
+  produced a PDF exited 0 however many errors the log held, and `check` always
+  exited 0. Warnings and skipped checks still exit 0, and a page-limit overrun
+  stays advisory.
+
+### Added
+
+- `--strict` on `paperkit build` and `paperkit check`: warnings, skipped
+  checks and page-limit overruns then fail the run too.
+
 ## [0.1.0] - 2026-10-24
 
 First public release.

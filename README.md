@@ -137,6 +137,11 @@ name = "base"               # base | acm
 
 Global options: `--config PATH` (config file), `-v/--verbose` (show Docker commands), `-V/--version`.
 
+`build` and `check` exit 1 when the report says the build has errors, or when
+a target produced no PDF, and 0 on warnings. `--strict` also fails on
+warnings, skipped checks and page-limit overruns, which is what a paper
+repository's own CI usually wants.
+
 ## Checks
 
 What each check catches, when it is skipped rather than run, and how to

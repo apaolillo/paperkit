@@ -87,8 +87,19 @@ def _resolve_targets(config: PaperkitConfig, names: tuple[str, ...]) -> list[str
     default=None,
     help=f"Parallel build workers (default: cpu_count = {_default_jobs()})",
 )
+@click.option(
+    "--strict",
+    is_flag=True,
+    help="Also fail on warnings, skipped checks and page-limit overruns",
+)
 @click.pass_context
-def build(ctx: click.Context, names: tuple[str, ...], no_docker: bool, jobs: int | None) -> None:
+def build(
+    ctx: click.Context,
+    names: tuple[str, ...],
+    no_docker: bool,
+    jobs: int | None,
+    strict: bool,
+) -> None:
     """Build the paper PDF (loops over config.mains).
 
     With no NAMES, builds every main in config.mains. NAMES may be given with
@@ -108,9 +119,16 @@ def build(ctx: click.Context, names: tuple[str, ...], no_docker: bool, jobs: int
         n_jobs = _default_jobs()
 
     if no_docker:
-        _build_host(config, targets, jobs=n_jobs)
+        _build_host(config, targets, jobs=n_jobs, strict=strict)
     else:
-        _build_docker(config, targets, names, jobs=n_jobs, verbose=ctx.obj["verbose"])
+        _build_docker(
+            config,
+            targets,
+            names,
+            jobs=n_jobs,
+            strict=strict,
+            verbose=ctx.obj["verbose"],
+        )
 
 
 @main.command()
@@ -153,12 +171,22 @@ def _run_one(config: PaperkitConfig, main: str) -> dict:
     }
 
 
-def _build_host(config: PaperkitConfig, targets: list[str], jobs: int = 1) -> None:
+def _build_host(
+    config: PaperkitConfig,
+    targets: list[str],
+    jobs: int = 1,
+    strict: bool = False,
+) -> None:
     """Build *targets* directly on the host (parallel by default for several)."""
     from paperkit.bibliography import project_bib_checks
     from paperkit.builder import BuildResult, build_paper
     from paperkit.checks import CheckResult, run_all_checks
-    from paperkit.report import get_environment_info, print_multi_summary, print_report
+    from paperkit.report import (
+        exit_code,
+        get_environment_info,
+        print_multi_summary,
+        print_report,
+    )
 
     n = len(targets)
     runs: list[tuple[str, BuildResult, list[CheckResult]]] = []
@@ -174,6 +202,7 @@ def _build_host(config: PaperkitConfig, targets: list[str], jobs: int = 1) -> No
             check_results = run_all_checks(config, result, bib_results)
             print_report(result, check_results, env_info=env_info)
             runs.append((main, result, check_results))
+            sys.exit(exit_code(check_results, strict=strict))
         else:
             runs.append((main, result, []))
             sys.exit(1)
@@ -214,8 +243,9 @@ def _build_host(config: PaperkitConfig, targets: list[str], jobs: int = 1) -> No
     shared = project_bib_checks(config, built, focus=targets, failed=failed)
     print_multi_summary(runs, shared)
 
-    if not all(r.success for _, r, _ in runs):
-        sys.exit(1)
+    every_target_built = all(r.success for _, r, _ in runs)
+    all_results = [cr for _, _, checks in runs for cr in checks] + shared
+    sys.exit(exit_code(all_results, strict=strict, built=every_target_built))
 
 
 def _emit_progress(k: int, n: int, main: str, success: bool, captured: str) -> None:
@@ -232,6 +262,7 @@ def _build_docker(
     targets: list[str],
     names: tuple[str, ...] = (),
     jobs: int = 1,
+    strict: bool = False,
     verbose: bool = False,
 ) -> None:
     """Build inside a Docker container; the inner CLI invocation does the looping."""
@@ -251,7 +282,8 @@ def _build_docker(
     # The inner invocation re-reads .paperkit.toml, so pass the selection along.
     rc = run_in_docker(
         config,
-        f"paperkit build --no-docker --jobs {jobs}{_shell_args(names)}",
+        f"paperkit build --no-docker --jobs {jobs}"
+        f"{' --strict' if strict else ''}{_shell_args(names)}",
         verbose=verbose,
         env=reproducible.build_env(source_date),
     )
@@ -267,8 +299,13 @@ def _shell_args(args: tuple[str, ...]) -> str:
 @main.command()
 @click.argument("names", nargs=-1)
 @click.option("--no-docker", is_flag=True, help="Run checks on host instead of in Docker")
+@click.option(
+    "--strict",
+    is_flag=True,
+    help="Also fail on warnings, skipped checks and page-limit overruns",
+)
 @click.pass_context
-def check(ctx: click.Context, names: tuple[str, ...], no_docker: bool) -> None:
+def check(ctx: click.Context, names: tuple[str, ...], no_docker: bool, strict: bool) -> None:
     """Run checks on existing build output and print full per-main reports.
 
     With no NAMES, checks every main in config.mains. NAMES may be given with
@@ -280,28 +317,42 @@ def check(ctx: click.Context, names: tuple[str, ...], no_docker: bool) -> None:
     targets = _resolve_targets(config, names)
 
     if no_docker:
-        _check_host(config, targets)
+        _check_host(config, targets, strict=strict)
     else:
-        _check_docker(config, names, verbose=ctx.obj["verbose"])
+        _check_docker(config, names, strict=strict, verbose=ctx.obj["verbose"])
 
 
-def _check_docker(config: PaperkitConfig, names: tuple[str, ...], verbose: bool = False) -> None:
+def _check_docker(
+    config: PaperkitConfig,
+    names: tuple[str, ...],
+    strict: bool = False,
+    verbose: bool = False,
+) -> None:
     """Run `paperkit check` inside the container."""
     from paperkit.docker import build_image, run_in_docker
 
     click.echo(_header("\U0001f433 Building Docker image ..."))
     build_image(config, verbose=verbose)
-    rc = run_in_docker(config, f"paperkit check --no-docker{_shell_args(names)}", verbose=verbose)
+    rc = run_in_docker(
+        config,
+        f"paperkit check --no-docker{' --strict' if strict else ''}{_shell_args(names)}",
+        verbose=verbose,
+    )
     if rc:
         sys.exit(rc)
 
 
-def _check_host(config: PaperkitConfig, targets: list[str]) -> None:
+def _check_host(config: PaperkitConfig, targets: list[str], strict: bool = False) -> None:
     """Run checks on the host, with the host's tools."""
     from paperkit.bibliography import project_bib_checks
     from paperkit.builder import BuildResult
     from paperkit.checks import CheckResult, run_all_checks
-    from paperkit.report import get_environment_info, print_multi_summary, print_report
+    from paperkit.report import (
+        exit_code,
+        get_environment_info,
+        print_multi_summary,
+        print_report,
+    )
 
     outputs: dict[str, BuildResult] = {}
     for main in targets:
@@ -338,6 +389,11 @@ def _check_host(config: PaperkitConfig, targets: list[str]) -> None:
 
     if not single:
         print_multi_summary(runs, bib_results)
+
+    all_results = [cr for _, _, checks in runs for cr in checks]
+    if not single:
+        all_results += bib_results
+    sys.exit(exit_code(all_results, strict=strict))
 
 
 @main.command(name="zip")
