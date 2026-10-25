@@ -5,6 +5,7 @@
 
 import datetime as dt
 import fnmatch
+import json
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -97,6 +98,38 @@ def _staleness_warnings(config: PaperkitConfig, main: str, bbl: Path, tex: Path)
     return warnings
 
 
+def _typst_inputs(config: PaperkitConfig, mains: list[str], warnings: list[str]) -> set[Path]:
+    """Exactly the project files each main's compilation read, plus its fonts.
+
+    `typst compile --deps` wrote the list at build time; a publisher that
+    asks for "the sources the PDF was built from" gets precisely that. Files
+    outside the root (packages in the image's cache) are not the project's
+    to ship and are left out.
+    """
+    root = config.root.resolve()
+    files: set[Path] = set()
+    for main in mains:
+        deps = root / config.output_dir / main / f"{main}.deps"
+        if not deps.is_file():
+            warnings.append(
+                f"{main}: no dependency list from a build, archiving the [zip] patterns only"
+                " (run `paperkit build` first for the exact sources)",
+            )
+            continue
+        try:
+            inputs = json.loads(deps.read_text()).get("inputs", [])
+        except (ValueError, AttributeError):
+            warnings.append(f"{main}: unreadable {deps.name}, archiving the [zip] patterns only")
+            continue
+        for item in inputs:
+            path = (root / item).resolve()
+            if path.is_file() and root in path.parents:
+                files.add(path)
+    for d in config.typst.fonts:
+        files |= {p for p in (root / d).rglob("*") if p.is_file()}
+    return files
+
+
 def create_zip(config: PaperkitConfig, include_bbl: bool | None = None) -> ZipResult:
     """Create the submission zip archive.
 
@@ -122,16 +155,20 @@ def create_zip(config: PaperkitConfig, include_bbl: bool | None = None) -> ZipRe
         for p in _expand_pattern(root, pattern):
             if p.is_file() and not _is_excluded(p, config.zip.exclude):
                 files.add(p)
+    deps_warnings: list[str] = []
+    if config.is_typst:
+        files |= _typst_inputs(config, mains, deps_warnings)
 
     # Resolved before the old archive is removed, so a missing .bbl leaves it
     # in place. The exclude patterns do not apply: these are asked for by name.
     wanted = config.zip.include_bbl if include_bbl is None else include_bbl
-    warnings: list[str] = []
+    warnings: list[str] = list(deps_warnings)
     bbl_entries: dict[str, Path] = {}
     if wanted and config.is_typst:
         warnings.append("include_bbl ignored: a Typst build carries its bibliography in the PDF")
     elif wanted:
-        bbl_entries, warnings = _bbl_entries(config, files)
+        bbl_entries, bbl_warnings = _bbl_entries(config, files)
+        warnings += bbl_warnings
 
     # Entry metadata is normalized to the build timestamp, so the same sources
     # archive to the same bytes on another machine or a fresh clone, where the
