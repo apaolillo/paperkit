@@ -59,6 +59,8 @@ reports what the inner run found.
 | Unused bib entries | Entries no target cites | - | `[checks] unused_bib` |
 | BibTeX tidy | A bibliography bibtex-tidy would reformat, and duplicate entries | `bibtex-tidy` | `[checks] bibtex_tidy` |
 | Pages/Limit | A paper over its page budget | `pdfinfo`, `pdftotext` | `[page_limits]` |
+| Typst | Errors and warnings typst printed, font substitutions included | - | Typst projects, always on |
+| Typst packages | Universe packages the build downloaded that `[typst] packages` does not declare | - | Typst projects, always on |
 
 ### LaTeX, BibTeX and Biber logs
 
@@ -67,9 +69,25 @@ says Biber or BibTeX depending on the backend, so the report names the tool
 that actually ran. A log that does not exist, because that stage never ran,
 contributes nothing rather than an error.
 
+### Typst, Typst packages
+
+For a Typst project the log is what `typst compile` printed, kept in
+`<main>.log` behind a `typst <version>` line. Errors and warnings are
+counted and listed with their file and line; a font family the build could
+not find is a warning here, which is the point of keeping system fonts out of
+a build. Boxes, BibTeX logs and the `.bbl` do not exist for Typst and stay
+out of the report.
+
+The packages check reads the compilation's dependency list and names every
+Universe package it used that `[typst] packages` does not declare: those were
+downloaded during the build, which is the network dependency declaring them
+removes. Packages from a local namespace are never reported.
+
 ### Toolchain
 
-Only with `[texlive] source = "upstream"`. The report's TeX Live line comes
+For a Typst project, the banner is compared with the pinned `[typst] version`
+and a build with another typst, usually a `--no-docker` build on the host,
+is a warning. For LaTeX, only with `[texlive] source = "upstream"`. The report's TeX Live line comes
 from the first line of the build log, not from asking the local binary, so it
 describes the engine that made the PDF. This check compares that banner with
 the configured TeX Live and warns when they cannot be the same: a

@@ -1,11 +1,11 @@
 # Roadmap
 
-- **Typst support**: build and check Typst papers too.
+Typst support shipped with 0.2.0. What remains on the horizon:
 
-Profiles would come with it. Typst Universe carries community templates for
-the usual venues (IEEE, ACM, LNCS, among others), unofficial but widely used,
-and a `typst-ieee` or `typst-acm` profile would do for a Typst project what
-`ieee` and `acm` do for a LaTeX one: what the archive ships, whether the
-compiled bibliography travels, and how the page budget is counted. The checks
-that read the PDF rather than the sources (fonts, page limits) carry over
-unchanged.
+- **Typst profiles for the other venues** (`typst-lncs`, `typst-usenix`), when
+  a Universe template and a paper that uses it come together.
+- **Title and abstract export for Typst papers**, which needs a convention for
+  where a template keeps them; `typst query` can read metadata a paper
+  exposes, so a small `#metadata` block may be enough.
+- **A build cache for TeX Live images** keyed by the `[texlive]` table, so two
+  projects with the same pin share one image.

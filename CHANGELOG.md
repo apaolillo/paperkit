@@ -26,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Typst support: `[build] engine = "typst"` builds `<main>.typ` in an image
+  without TeX Live, around a Typst release pinned by version and checksum
+  (`[typst] version`, or `build_from_source` for a cargo build). Typst's
+  diagnostics are the log, `typst query` supplies the citations for the
+  unused-entry check (Hayagriva `.yml` bibliographies included), the
+  toolchain check compares the compiler with the pin, and the archive is the
+  exact set of files the compilation read. Fonts come from the project
+  (`[typst] fonts`) and the image, never from the machine; Universe packages
+  declared in `[typst] packages` are fetched when the image is built, and an
+  undeclared import is reported. `paperkit init --typst`, and `typst`,
+  `typst-acm` and `typst-ieee` profiles for Universe's templates.
 - `--strict` on `paperkit build` and `paperkit check`: warnings, skipped
   checks and page-limit overruns then fail the run too.
 - `ieee` and `lncs` profiles, for the IEEEtran and llncs classes: each ships
@@ -37,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The bibtex-tidy check named `references.bib` whatever the configured
+  bibliography was called.
 - A configuration error (an unknown `[texlive]` key, a bad snapshot date, a
   glob matching no file, ...) is reported as a one-line message with exit
   status 1 instead of a Python traceback.

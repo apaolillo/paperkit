@@ -62,7 +62,7 @@ will not be reproducible.
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `base_image` | string | `"ubuntu:26.04"` | Image the build image is layered on |
-| `image_name` | string | `"paperkit-builder"` | Tag of the built image |
+| `image_name` | string | `"paperkit-builder"`, `"paperkit-typst-builder"` for Typst | Tag of the built image |
 | `extra_packages` | list | `[]` | Extra APT packages for this project |
 | `debconf_selections` | list | `[]` | debconf answers pre-seeded before those packages install |
 
@@ -132,7 +132,7 @@ without TeX Live: the pinned Typst binary, the check tools and paperkit.
 | `sha256` | 64 hex chars | known for the default version | Checksum of the release tarball for this machine's architecture; required for any other version |
 | `build_from_source` | bool | `false` | `cargo install --locked typst-cli` pinned to the version's tag, instead of the release binary |
 | `fonts` | list | `[]` | Directories of fonts, relative to the root, searched recursively (`--font-path`) |
-| `ignore_system_fonts` | bool | `true` | Do not search the machine's fonts; the embedded fonts and `fonts` are all a build sees |
+| `ignore_system_fonts` | bool | `true` | Do not search the machine's fonts; the embedded fonts, `fonts`, and fonts installed in the image are all a build sees |
 | `packages` | list | `[]` | Universe packages as imported, `"@preview/charged-ieee:0.1.4"`, downloaded into the image when it is built |
 | `packages_dir` | string | unset | A local packages tree on the host (namespaces as subdirectories), mounted read-only into the container |
 | `pdf_standard` | string | unset | One of typst's `--pdf-standard` values, such as `a-2b`, for venues that require PDF/A |
@@ -146,8 +146,11 @@ sources, with two exceptions that these keys close. Fonts: Typst searches the
 machine's fonts by default and substitutes silently when a family is missing,
 so the same sources render differently on another machine; with
 `ignore_system_fonts = true` a build sees only the fonts Typst embeds
-(Libertinus, New Computer Modern, DejaVu Sans Mono) and the project's own
-`fonts` directories, and a missing family is reported as a warning. Packages:
+(Libertinus Serif, New Computer Modern, DejaVu Sans Mono), the project's own
+`fonts` directories, and the fonts installed in the image by `[docker]
+extra_packages` or a profile, which are part of the pinned environment; a
+missing family is reported as a warning with the file and line that asked
+for it. Packages:
 an import from Typst Universe is fetched over the network the first time it
 is used; listing it under `packages` fetches it when the image is built, so
 builds themselves need no network. A package the sources import without
@@ -243,7 +246,7 @@ sources zip to the same bytes on another machine.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `name` | string | `"acm"` | `base`, `acm`, `ieee`, `lncs` or `usenix` |
+| `name` | string | `"acm"` | `base`, `acm`, `ieee`, `lncs`, `usenix`, `typst`, `typst-acm` or `typst-ieee` |
 
 A profile carries what a venue's document class implies for a project, as
 defaults laid underneath the file: a key the file sets wins, and a list the
@@ -256,6 +259,9 @@ file sets replaces the profile's list rather than merging with it.
 | `ieee` | base's list plus `IEEEtran.cls` and `IEEEtran.bst`; `[zip] include_bbl = true` |
 | `lncs` | base's list plus `llncs.cls` and `splncs04.bst`; `[zip] include_bbl = true` |
 | `usenix` | `[page_limits] ack_counts_as_content = true` |
+| `typst` | `[zip] include = ["{main}.typ", "**/*.typ", "**/*.bib", "**/*.yml", "**/*.yaml", "fonts/**"]`, `include_bbl = false` |
+| `typst-ieee` | as `typst`; installs `fonts-texgyre` in the image for `charged-ieee` |
+| `typst-acm` | as `typst`; `[page_limits] ack_counts_as_content = true` |
 
 The reasoning: ACM's TAPS, IEEE's PDF eXpress and Springer's LNCS pipeline
 all compile the submitted sources without running BibTeX, so the archive must carry the `.bbl`, and a

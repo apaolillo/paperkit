@@ -7,8 +7,7 @@ Reproducible builds and pre-submission checks for research papers. paperkit
 builds your paper in a container composed from a config file, then checks it
 for the problems that get submissions desk-rejected or camera-ready PDFs
 bounced: page limits, Type 3 or unembedded fonts, LaTeX errors, overfull
-boxes, unused bibliography entries. It currently supports LaTeX; Typst is on
-the [roadmap](ROADMAP.md).
+boxes, unused bibliography entries. It builds LaTeX and Typst papers.
 
 ## Features
 
@@ -30,6 +29,45 @@ the [roadmap](ROADMAP.md).
   exclude patterns, and the title and abstract exported as plain text for
   pasting into submission forms.
 - **Profiles**: defaults per publisher (base and ACM so far).
+
+## Typst
+
+Set `engine = "typst"` and the main file is `<main>.typ`; everything else in
+the config means the same. A Typst project builds in an image without TeX
+Live, a fraction of the size, around a pinned Typst release verified by its
+checksum, and the checks that read the PDF (fonts, page limits) or the sources
+(non-ASCII, whitespace) work unchanged. Citations come from `typst query`, the
+build-derived truth the `.aux` is for LaTeX; Typst's own diagnostics are the
+log; the archive is exactly the files the compilation read, from
+`typst compile --deps`.
+
+Two things make a Typst build depend on the machine unless the project says
+otherwise, and `[typst]` closes both: fonts, which Typst takes from the system
+by default and substitutes silently when a family is missing, so system fonts
+are off and the project lists its own `fonts` directories (fonts installed in
+the image are visible); and Universe packages, fetched over the network on
+first import, so the project declares them and the image build fetches them
+once. An import nobody declared still builds, and the report says so.
+
+```toml
+[build]
+engine = "typst"
+
+[typst]
+version = "0.15.1"
+packages = ["@preview/charged-ieee:0.1.4"]
+fonts = ["fonts"]
+
+[profile]
+name = "typst-ieee"      # typst | typst-acm | typst-ieee
+```
+
+`paperkit init --typst` writes that template. The `typst-acm` and `typst-ieee`
+profiles mirror their LaTeX siblings for Typst Universe's templates
+(`faithful-acmart`, `charged-ieee`): the same page rule, Typst sources in the
+archive, no `.bbl`. Building Typst from source instead of the release binary,
+PDF/A, Hayagriva bibliographies and local package namespaces are covered in the
+[configuration reference](https://github.com/apaolillo/paperkit/blob/main/docs/configuration.md).
 
 ## Why paperkit
 
@@ -138,7 +176,7 @@ exclude = ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
 include_bbl = false         # also ship each main's compiled bibliography
 
 [profile]
-name = "base"               # base | acm | ieee | lncs | usenix
+name = "base"               # base | acm | ieee | lncs | usenix | typst | typst-acm | typst-ieee
 ```
 
 ## Commands
@@ -152,7 +190,7 @@ name = "base"               # base | acm | ieee | lncs | usenix
 | `paperkit check --no-docker` | Run checks with the host's tools |
 | `paperkit bibtidy` | Run bibtex-tidy on the bib file (in-place); `--no-sort` keeps the entry and field order |
 | `paperkit zip` | Create submission archive; `--bbl` adds the compiled bibliographies |
-| `paperkit init` | Generate a `.paperkit.toml` template (`--texlive distro` for the base image's packages) |
+| `paperkit init` | Generate a `.paperkit.toml` template (`--texlive distro` for the base image's packages, `--typst` for a Typst project) |
 | `paperkit texlive-update` | Move `[texlive]` to the newest dated snapshot (`--check` to only report) |
 
 Global options: `--config PATH` (config file), `-v/--verbose` (show Docker commands), `-V/--version`.
@@ -252,6 +290,10 @@ your `.paperkit.toml`: anything the file sets wins.
 - **`usenix`**: counts the acknowledgments as content, as USENIX calls state
   their limits ("N pages, not including references"); submission is a PDF, so
   nothing to add to the archive.
+- **`typst`**, **`typst-acm`**, **`typst-ieee`**: for Typst papers; the venue
+  rules of their siblings, Typst sources and bibliographies in the archive, no
+  `.bbl`. `typst-ieee` also installs TeX Gyre in the image, which Universe's
+  `charged-ieee` sets.
 
 `paperkit init --profile ieee` writes the profile's values into the generated
 file, so nothing is hidden behind the name. The exact defaults are listed in
