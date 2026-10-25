@@ -25,7 +25,16 @@ from paperkit.profiles.usenix import USENIXProfile
 
 
 def test_the_built_in_profiles_resolve_to_their_classes() -> None:
-    assert profile_names() == ["acm", "base", "ieee", "lncs", "usenix"]
+    assert profile_names() == [
+        "acm",
+        "base",
+        "ieee",
+        "lncs",
+        "typst",
+        "typst-acm",
+        "typst-ieee",
+        "usenix",
+    ]
     assert type(get_profile("base")) is BaseProfile
     assert type(get_profile("acm")) is ACMProfile
     assert type(get_profile("ieee")) is IEEEProfile
@@ -34,7 +43,7 @@ def test_the_built_in_profiles_resolve_to_their_classes() -> None:
 
 
 def test_an_unknown_profile_is_an_error_not_a_fallback() -> None:
-    expected = r"unknown profile 'amc' \(expected one of: acm, base, ieee, lncs, usenix\)"
+    expected = r"unknown profile 'amc' \(expected one of: acm, base, ieee, lncs, typst, .*usenix\)"
     with pytest.raises(ValueError, match=expected):
         get_profile("amc")
 
@@ -63,7 +72,9 @@ _SECTION_CLASSES = {
 }
 
 
-@pytest.mark.parametrize("name", ["base", "acm", "ieee", "lncs", "usenix"])
+@pytest.mark.parametrize(
+    "name", ["base", "acm", "ieee", "lncs", "usenix", "typst", "typst-acm", "typst-ieee"]
+)
 def test_every_default_names_a_real_config_key(name: str) -> None:
     # A profile default for a key the loader does not know would be silently
     # ignored, which is worse than no default at all.
@@ -107,6 +118,17 @@ def test_usenix_only_counts_the_acknowledgments() -> None:
     assert d["page_limits"] == {"ack_counts_as_content": True}
     assert d["zip"] == get_profile("base").defaults()["zip"]
     assert "build" not in d
+
+
+def test_typst_profiles_ship_sources_and_no_bbl() -> None:
+    base = get_profile("typst").defaults()
+    assert base["zip"]["include"][:2] == ["{main}.typ", "**/*.typ"]
+    assert base["zip"]["include_bbl"] is False
+    assert "page_limits" not in base
+    assert get_profile("typst-ieee").defaults() == base
+    acm = get_profile("typst-acm").defaults()
+    assert acm["zip"] == base["zip"]
+    assert acm["page_limits"] == {"ack_counts_as_content": True}
 
 
 def test_profiles_do_not_share_their_lists() -> None:

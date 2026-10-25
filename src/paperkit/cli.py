@@ -14,7 +14,7 @@ from pathlib import Path
 
 import click
 
-from paperkit import __version__, reproducible, texlive
+from paperkit import __version__, reproducible, texlive, typst
 from paperkit.config import PaperkitConfig, load_config
 
 # ANSI
@@ -571,6 +571,67 @@ def texlive_update(ctx: click.Context, check: bool) -> None:
     click.echo(f"  {_BOLD}\u2705 {config_path.name} updated{_RESET}; rebuild to pick it up")
 
 
+def _init_typst(profile: str) -> None:
+    """Write the template of a Typst project."""
+    from paperkit.profiles import get_profile
+
+    d = get_profile(profile).defaults()
+    includes = "".join(f"    {json.dumps(i)},\n" for i in d["zip"]["include"])
+    acks = json.dumps(d.get("page_limits", {}).get("ack_counts_as_content", False))
+    template = f"""[project]
+main = "main"                              # main file (without extension)
+content_dirs = ["content"]
+bib = "refs.bib"                           # .bib or Hayagriva .yml
+
+[build]
+engine = "typst"
+
+[docker]
+base_image = "ubuntu:26.04"
+image_name = "paper-builder"
+
+# The pinned compiler: the release this paperkit was verified with. Fonts
+# come from the project and from typst's embedded set, never from the machine,
+# so a build looks the same everywhere; list the Universe packages the paper
+# imports so the image carries them and builds need no network.
+[typst]
+version = "{typst.KNOWN_GOOD_VERSION}"
+fonts = []                                 # e.g. ["fonts"]
+ignore_system_fonts = true
+packages = []                              # e.g. ["@preview/charged-ieee:0.1.4"]
+# packages_dir = "~/.local/share/typst/packages"   # a local namespace, mounted read-only
+
+[checks]
+non_ascii = true
+trailing_whitespace = true
+final_newline = true
+unused_bib = true
+font_embedding = true
+no_type3 = true
+bibtex_tidy = {{ enabled = true, version = "1.14.0" }}
+
+# [page_limits]
+# before_refs = 12
+# ack_counts_as_content = {acks}
+
+# What the "{profile}" profile ships; `paperkit zip` adds the exact files the
+# last build read, from its dependency list.
+[zip]
+name = "main"
+include = [
+{includes}]
+
+[profile]
+name = "{profile}"
+"""
+    dest = Path.cwd() / ".paperkit.toml"
+    if dest.exists():
+        click.echo(f".paperkit.toml already exists at {dest}")
+        sys.exit(1)
+    dest.write_text(template)
+    click.echo(f"\u2705 Created {dest}")
+
+
 def _texlive_block(mode: str) -> str:
     """The [texlive] section `paperkit init` writes."""
     if mode == "distro":
@@ -613,13 +674,25 @@ def _profile_choices() -> list[str]:
     default="snapshot",
     help="TeX Live source for the new project (default: snapshot)",
 )
-def init(profile: str, texlive_mode: str) -> None:
+@click.option(
+    "--typst",
+    "typst_mode",
+    is_flag=True,
+    help="A Typst project: engine typst, a [typst] section, and a typst-* profile",
+)
+def init(profile: str, texlive_mode: str, typst_mode: bool) -> None:
     """Generate a .paperkit.toml template.
 
     The values the profile would apply anyway are written out, so the file
     shows what a build will do instead of hiding it behind the profile name.
     """
     from paperkit.profiles import get_profile
+
+    if typst_mode:
+        if not profile.startswith("typst"):
+            profile = "typst-acm" if profile == "acm" else f"typst-{profile}"
+        _init_typst(profile)
+        return
 
     d = get_profile(profile).defaults()
     passes = d.get("build", {}).get("passes", 3)

@@ -62,3 +62,25 @@ def test_init_rejects_an_unknown_profile(tmp_path: Path, monkeypatch: pytest.Mon
     assert result.exit_code == 2
     assert all(n in result.output for n in ("acm", "ieee", "lncs", "usenix"))
     assert not (tmp_path / ".paperkit.toml").exists()
+
+
+def test_init_typst_writes_a_typst_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(cli.main, ["init", "--typst", "--profile", "ieee"])
+    assert result.exit_code == 0, result.output
+    text = (tmp_path / ".paperkit.toml").read_text()
+    assert 'engine = "typst"' in text
+    assert 'name = "typst-ieee"' in text
+    assert "ignore_system_fonts = true" in text
+    assert '"{main}.typ",' in text
+    cfg = load_config(tmp_path / ".paperkit.toml")
+    assert cfg.is_typst and cfg.profile_name == "typst-ieee"
+    assert cfg.zip.include_bbl is False
+
+
+def test_init_typst_defaults_to_the_acm_sibling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    CliRunner().invoke(cli.main, ["init", "--typst"])
+    assert 'name = "typst-acm"' in (tmp_path / ".paperkit.toml").read_text()
