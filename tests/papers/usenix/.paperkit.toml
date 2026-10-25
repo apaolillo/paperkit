@@ -1,0 +1,18 @@
+# USENIX's own style file is not in TeX Live, so this is a plain two-column
+# article under the usenix profile. The profile counts the acknowledgments
+# as content; this paper's acknowledgments start a second page, which is
+# over the one-page budget below under usenix and would not be under base.
+[project]
+main = "paper"
+content_dirs = ["."]
+bib = "refs.bib"
+
+[build]
+shell_escape = false
+bibtex = true
+
+[page_limits]
+before_refs = 1
+
+[profile]
+name = "usenix"

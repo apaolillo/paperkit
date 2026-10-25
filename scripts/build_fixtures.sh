@@ -68,6 +68,10 @@ fi
 # is not an error by itself, but is one under --strict.
 expect warnings 0
 expect warnings 1 --strict
+# Over its page budget only because the usenix profile counts the
+# acknowledgments: the profile's one default, seen end to end.
+expect usenix 0
+expect usenix 1 --strict
 
 if [ "${failures}" -ne 0 ]; then
     echo "${failures} fixture(s) did not end as expected" >&2

@@ -60,5 +60,5 @@ def test_init_rejects_an_unknown_profile(tmp_path: Path, monkeypatch: pytest.Mon
     monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(cli.main, ["init", "--profile", "amc"])
     assert result.exit_code == 2
-    assert "acm" in result.output and "ieee" in result.output and "lncs" in result.output
+    assert all(n in result.output for n in ("acm", "ieee", "lncs", "usenix"))
     assert not (tmp_path / ".paperkit.toml").exists()

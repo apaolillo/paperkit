@@ -18,7 +18,7 @@ NAMES = sorted(p.name for p in PAPERS.iterdir() if p.is_dir()) if PAPERS.is_dir(
 
 
 def test_the_fixtures_are_there() -> None:
-    assert NAMES == ["acmart", "ieee", "lncs", "minimal", "warnings"]
+    assert NAMES == ["acmart", "ieee", "lncs", "minimal", "usenix", "warnings"]
 
 
 @pytest.mark.parametrize("name", NAMES)

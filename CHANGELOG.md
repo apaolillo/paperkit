@@ -30,9 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks and page-limit overruns then fail the run too.
 - `ieee` and `lncs` profiles, for the IEEEtran and llncs classes: each ships
   its class and style files and the compiled `.bbl`, since PDF eXpress and
-  Springer's pipeline both compile without running BibTeX. `paperkit init
-  --profile NAME` validates the name and writes the profile's defaults into
-  the generated file.
+  Springer's pipeline both compile without running BibTeX. A `usenix` profile
+  counts the acknowledgments as content, as USENIX calls state their limits.
+  `paperkit init --profile NAME` validates the name and writes the profile's
+  defaults into the generated file.
 
 ### Fixed
 

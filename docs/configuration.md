@@ -205,7 +205,7 @@ sources zip to the same bytes on another machine.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `name` | string | `"acm"` | `base`, `acm`, `ieee` or `lncs` |
+| `name` | string | `"acm"` | `base`, `acm`, `ieee`, `lncs` or `usenix` |
 
 A profile carries what a venue's document class implies for a project, as
 defaults laid underneath the file: a key the file sets wins, and a list the
@@ -217,14 +217,18 @@ file sets replaces the profile's list rather than merging with it.
 | `acm` | base's list plus `acmart.cls` and `ACM-Reference-Format.bst`; `[zip] include_bbl = true`; `[build] passes = 4`; `[page_limits] ack_counts_as_content = true` |
 | `ieee` | base's list plus `IEEEtran.cls` and `IEEEtran.bst`; `[zip] include_bbl = true` |
 | `lncs` | base's list plus `llncs.cls` and `splncs04.bst`; `[zip] include_bbl = true` |
+| `usenix` | `[page_limits] ack_counts_as_content = true` |
 
 The reasoning: ACM's TAPS, IEEE's PDF eXpress and Springer's LNCS pipeline
 all compile the submitted sources without running BibTeX, so the archive must carry the `.bbl`, and a
 project that pins its own copy of the class or style file must ship it, while
 a pattern matching no file is simply skipped. The fourth pass lets acmart's
-`pbalance` balance the last page, and ACM calls state the page limit for the
-body with acknowledgments inside it. IEEE and LNCS page rules vary by
-conference, so those profiles leave `[page_limits]` alone.
+`pbalance` balance the last page. ACM and USENIX calls state the page limit
+as "N pages, not including references", so the acknowledgments sit inside
+the budget; IEEE and LNCS page rules vary by conference, so those profiles
+leave `[page_limits]` alone. USENIX submission is a PDF and its style file
+ships with the template, not TeX Live, so the `usenix` profile has nothing
+to add to the archive beyond base's `*.sty`.
 
 Because `acm`, `ieee` and `lncs` default `include_bbl` to true, `paperkit zip` in such
 a project needs a build first, or `--no-bbl`.

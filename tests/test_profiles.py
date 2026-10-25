@@ -21,18 +21,20 @@ from paperkit.profiles import BaseProfile, get_profile, profile_names, register_
 from paperkit.profiles.acm import ACMProfile
 from paperkit.profiles.ieee import IEEEProfile
 from paperkit.profiles.lncs import LNCSProfile
+from paperkit.profiles.usenix import USENIXProfile
 
 
 def test_the_built_in_profiles_resolve_to_their_classes() -> None:
-    assert profile_names() == ["acm", "base", "ieee", "lncs"]
+    assert profile_names() == ["acm", "base", "ieee", "lncs", "usenix"]
     assert type(get_profile("base")) is BaseProfile
     assert type(get_profile("acm")) is ACMProfile
     assert type(get_profile("ieee")) is IEEEProfile
     assert type(get_profile("lncs")) is LNCSProfile
+    assert type(get_profile("usenix")) is USENIXProfile
 
 
 def test_an_unknown_profile_is_an_error_not_a_fallback() -> None:
-    expected = r"unknown profile 'amc' \(expected one of: acm, base, ieee, lncs\)"
+    expected = r"unknown profile 'amc' \(expected one of: acm, base, ieee, lncs, usenix\)"
     with pytest.raises(ValueError, match=expected):
         get_profile("amc")
 
@@ -61,7 +63,7 @@ _SECTION_CLASSES = {
 }
 
 
-@pytest.mark.parametrize("name", ["base", "acm", "ieee", "lncs"])
+@pytest.mark.parametrize("name", ["base", "acm", "ieee", "lncs", "usenix"])
 def test_every_default_names_a_real_config_key(name: str) -> None:
     # A profile default for a key the loader does not know would be silently
     # ignored, which is worse than no default at all.
@@ -98,6 +100,15 @@ def test_lncs_adds_its_class_files_and_bbl() -> None:
     assert "build" not in d and "page_limits" not in d
 
 
+def test_usenix_only_counts_the_acknowledgments() -> None:
+    # Submission is a PDF and the style ships with the template, so the one
+    # thing the profile knows is how USENIX counts pages.
+    d = get_profile("usenix").defaults()
+    assert d["page_limits"] == {"ack_counts_as_content": True}
+    assert d["zip"] == get_profile("base").defaults()["zip"]
+    assert "build" not in d
+
+
 def test_profiles_do_not_share_their_lists() -> None:
     # Each defaults() call builds fresh lists: an append in one profile, or by
     # a caller, must not leak into another.
@@ -108,7 +119,7 @@ def test_profiles_do_not_share_their_lists() -> None:
 
 def test_acm_and_ieee_build_on_base_for_everything_else() -> None:
     base = BaseProfile()
-    for cls in (ACMProfile, IEEEProfile, LNCSProfile):
+    for cls in (ACMProfile, IEEEProfile, LNCSProfile, USENIXProfile):
         p = cls()
         assert p.docker_packages() == base.docker_packages() == []
         assert p.bibtex_tidy_args() == base.bibtex_tidy_args()

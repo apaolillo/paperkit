@@ -138,7 +138,7 @@ exclude = ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
 include_bbl = false         # also ship each main's compiled bibliography
 
 [profile]
-name = "base"               # base | acm | ieee | lncs
+name = "base"               # base | acm | ieee | lncs | usenix
 ```
 
 ## Commands
@@ -249,6 +249,9 @@ your `.paperkit.toml`: anything the file sets wins.
   eXpress compiles without BibTeX.
 - **`lncs`**: also ships `llncs.cls`, `splncs04.bst` and the `.bbl`, which
   Springer's camera-ready checklist asks for.
+- **`usenix`**: counts the acknowledgments as content, as USENIX calls state
+  their limits ("N pages, not including references"); submission is a PDF, so
+  nothing to add to the archive.
 
 `paperkit init --profile ieee` writes the profile's values into the generated
 file, so nothing is hidden behind the name. The exact defaults are listed in

@@ -11,6 +11,7 @@ and the checks reading a real PDF.
 | `ieee` | The same for IEEEtran, under the `ieee` profile. Everything clean. |
 | `lncs` | The same for Springer's llncs, under the `lncs` profile. Everything clean. |
 | `warnings` | Trips every warning-level check and goes over its page limit, without a single error. |
+| `usenix` | A two-column article whose acknowledgments start a second page. Over its one-page budget only because the `usenix` profile counts them: `--strict` exits 1, and would not under `base`. |
 
 `warnings` is the interesting one. It contains, on purpose: a line with
 trailing whitespace, a file with a non-ASCII character and no final newline, a

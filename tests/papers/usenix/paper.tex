@@ -1,0 +1,30 @@
+\documentclass[letterpaper,twocolumn,10pt]{article}
+
+\title{A Paper in the USENIX Format}
+\author{A. Author \\ An Institution}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper exercises the page rule USENIX calls state: the limit excludes
+the references and nothing else.
+\end{abstract}
+
+\section{Introduction}
+
+Reproducible builds matter~\cite{reproducible}. The body of this paper fits
+on one page; the acknowledgments below do not, on purpose.
+
+\clearpage
+\section*{Acknowledgments}
+
+These acknowledgments start a new page, so they are the only content on it.
+Under the usenix profile they count, and the paper is over its one-page
+budget; under base they would be exempt.
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
