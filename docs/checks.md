@@ -107,7 +107,8 @@ badly.
 Type 3 fonts usually come from one of two places. matplotlib emits them by
 default, which `matplotlib.rcParams["pdf.fonttype"] = 42` fixes by switching
 to TrueType. METAFONT bitmap fonts appear when a Computer Modern variant is
-not available as Type 1, which installing `cm-super` fixes.
+not available as Type 1, which installing `cm-super` fixes; the paperkit
+image has it, with either TeX Live source.
 
 Every run writes the full listing to `<output_dir>/<main>/fonts.txt`. When
 Type 3 fonts are found, the check also reports which pages they are on, so

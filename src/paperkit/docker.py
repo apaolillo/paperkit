@@ -44,6 +44,12 @@ _DISTRO_TEX_PACKAGES = [
     "texlive-publishers",
     "texlive-plain-generic",
     "texlive-extra-utils",
+    # Computer Modern as Type 1 in the T1 encoding. Debian ships it apart
+    # from the texlive-* packages; without it, a document that selects T1
+    # (fontenc, or a glyph OT1 lacks, such as llncs' keyword separator) gets
+    # bitmap fonts, which the Type 3 check then reports. Upstream TeX Live
+    # has it in collection-fontsrecommended.
+    "cm-super",
     # Bibliography
     "biber",
     # minted's highlighter

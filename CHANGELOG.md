@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The image built from the base image's TeX Live packages now includes
+  `cm-super`, which Debian ships apart from them. Without it any text in
+  the T1 encoding was set in bitmap fonts, and the Type 3 check reported
+  the image's own fonts.
 - The bibtex-tidy check named `references.bib` whatever the configured
   bibliography was called.
 - A configuration error (an unknown `[texlive]` key, a bad snapshot date, a
