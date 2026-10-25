@@ -283,6 +283,10 @@ profile name.
 
 ## A complete example
 
+The projects under [examples/](../examples/) are complete configurations with
+the reason for each key written next to it, one per profile. The one below
+is the shape of them.
+
 ```toml
 [project]
 main = "paper"

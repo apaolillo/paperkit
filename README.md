@@ -28,7 +28,8 @@ boxes, unused bibliography entries. It builds LaTeX and Typst papers.
 - **Submission plumbing**: a source archive with configurable include and
   exclude patterns, and the title and abstract exported as plain text for
   pasting into submission forms.
-- **Profiles**: defaults per publisher (base and ACM so far).
+- **Profiles**: a venue's rules as defaults, for ACM, IEEE, LNCS and USENIX
+  papers and their Typst siblings.
 
 ## Typst
 
@@ -120,6 +121,15 @@ paperkit bibtidy
 # Create submission archive
 paperkit zip
 ```
+
+## Examples
+
+[examples/](examples/) holds a complete project per profile, LaTeX and
+Typst, each with a commented `.paperkit.toml` and a README saying what it
+shows: the smallest project, an ACM paper with its supplementary material
+and a pinned TeX Live, IEEE, LNCS and USENIX papers with their venue's page
+rule, and Typst papers in Universe's IEEE and ACM templates. Clone, enter one
+and run `paperkit build`; copy it to start your own.
 
 ## Configuration
 
@@ -441,12 +451,12 @@ uv run ruff format src tests # formatting
 uv run mypy src              # type checking
 uv run pytest                # tests
 
-./scripts/build_fixtures.sh --docker   # real builds of tests/papers, through the image
+./scripts/build_fixtures.sh --docker   # real builds of tests/papers and examples/, through the images
 ```
 
-The unit suite needs no TeX and runs in a second. The fixture papers are the
-only thing that exercises a real build; CI runs them weekly and when the
-build-related code changes, since they install a TeX Live.
+The unit suite needs no TeX and runs in a second. The fixture papers and the
+examples are the only thing that exercises a real build; CI runs them weekly
+and when the build-related code changes, since they install a TeX Live.
 
 Documentation lives in [docs/](docs/): the configuration reference and the
 checks reference.

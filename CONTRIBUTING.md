@@ -36,13 +36,16 @@ an error, so run the suite locally before pushing.
 
 A change to the build itself, in `builder.py`, `docker.py`, `texlive.py` or
 a profile, is not covered by the unit suite, which never runs an engine. For
-those, build the fixture papers too:
+those, build the fixture papers and the examples too:
 
 ```bash
 ./scripts/build_fixtures.sh --docker   # or without the flag, on a host with TeX
 ```
 
-CI does the same on pull requests that touch those files, and weekly.
+CI does the same on pull requests that touch those files, and weekly. The
+examples under `examples/` are held to `--strict` in the image: a new
+profile comes with an example named after it, and a change to an example
+keeps it building without a warning.
 
 What the suite does not check, but reviewers will:
 
