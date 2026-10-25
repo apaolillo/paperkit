@@ -79,7 +79,8 @@ def _resolve_targets(config: PaperkitConfig, names: tuple[str, ...]) -> list[str
     """
     if not names:
         return list(config.mains)
-    targets = [n[:-4] if n.endswith(".tex") else n for n in names]
+    suffix = config.main_suffix
+    targets = [n[: -len(suffix)] if n.endswith(suffix) else n for n in names]
     unknown = [t for t in targets if t not in config.mains]
     if unknown:
         click.echo(f"Unknown main(s): {', '.join(unknown)}")
@@ -205,7 +206,7 @@ def _build_host(
     # Single target: keep the existing chatty flow (live "[k/4]" pass markers + full report).
     if n == 1:
         main = targets[0]
-        click.echo(_header(f"\U0001f4c4 Building {main}.tex ..."))
+        click.echo(_header(f"\U0001f4c4 Building {main}{config.main_suffix} ..."))
         result = build_paper(config, main)
         if result.success:
             env_info = get_environment_info(config, result)
@@ -283,7 +284,7 @@ def _build_docker(
     build_image(config, verbose=verbose)
 
     n = len(targets)
-    label = f"{n} project(s)" if n != 1 else f"{targets[0]}.tex"
+    label = f"{n} project(s)" if n != 1 else f"{targets[0]}{config.main_suffix}"
     click.echo(_header(f"\U0001f4c4 Building {label} in Docker ..."))
     # The image has no git, so resolve the build timestamp here and pass it in;
     # the inner paperkit then takes it from the environment.
@@ -377,8 +378,10 @@ def _check_host(config: PaperkitConfig, targets: list[str], strict: bool = False
         outputs[main] = BuildResult(
             pdf=per_main_dir / f"{main}.pdf",
             log=log_path,
-            blg=per_main_dir / f"{main}.blg",
-            aux=per_main_dir / f"{main}.aux",
+            blg=None if config.is_typst else per_main_dir / f"{main}.blg",
+            aux=None if config.is_typst else per_main_dir / f"{main}.aux",
+            cites=per_main_dir / f"{main}.cites" if config.is_typst else None,
+            deps=per_main_dir / f"{main}.deps" if config.is_typst else None,
             output_dir=per_main_dir,
             success=True,
         )
@@ -624,7 +627,7 @@ def init(profile: str, texlive_mode: str) -> None:
     include_bbl = json.dumps(d["zip"].get("include_bbl", False))
     acks = json.dumps(d.get("page_limits", {}).get("ack_counts_as_content", False))
     template = f"""[project]
-main = "main"                              # main .tex file (without extension)
+main = "main"                              # main file (without extension)
 content_dirs = ["content"]
 bib = "references.bib"
 

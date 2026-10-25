@@ -28,6 +28,10 @@ class BuildResult:
     log: Path | None = None
     blg: Path | None = None
     aux: Path | None = None
+    # Typst builds: the citations recorded at build time, and the exact
+    # sources the compilation read.
+    cites: Path | None = None
+    deps: Path | None = None
     output_dir: Path = field(default_factory=lambda: Path("out"))
     success: bool = False
 
@@ -104,6 +108,68 @@ def run_biber(
     return result.returncode
 
 
+def typst_command(config: PaperkitConfig, main: str, output_dir: Path) -> list[str]:
+    """The `typst compile` invocation for *main*, from the [typst] table."""
+    tc = config.typst
+    cmd = [
+        "typst",
+        "compile",
+        "--root",
+        str(config.root),
+        "--diagnostic-format",
+        "short",
+        "--deps",
+        str(output_dir / f"{main}.deps"),
+        "--deps-format",
+        "json",
+    ]
+    if tc.ignore_system_fonts:
+        cmd.append("--ignore-system-fonts")
+    for d in tc.fonts:
+        cmd += ["--font-path", str(config.root / d)]
+    if tc.pdf_standard:
+        cmd += ["--pdf-standard", tc.pdf_standard]
+    cmd += tc.extra_args
+    cmd += [str(config.main_file(main)), str(output_dir / f"{main}.pdf")]
+    return cmd
+
+
+def run_typst(config: PaperkitConfig, main: str, output_dir: Path, env: dict[str, str]) -> int:
+    """One Typst compilation; its diagnostics become <main>.log behind a banner.
+
+    Typst has no log file of its own. The first line names the compiler, as
+    the first line of a LaTeX log does, so the report and the toolchain check
+    read both the same way. Returns the exit code.
+    """
+    banner = subprocess.run(["typst", "--version"], capture_output=True, text=True).stdout.strip()
+    proc = subprocess.run(
+        typst_command(config, main, output_dir),
+        capture_output=True,
+        text=True,
+        env=_environment(env),
+    )
+    (output_dir / f"{main}.log").write_text(f"{banner}\n{proc.stderr}{proc.stdout}")
+    return proc.returncode
+
+
+def _build_typst(
+    config: PaperkitConfig,
+    main: str,
+    output_dir: Path,
+    env: dict[str, str],
+) -> BuildResult:
+    from paperkit.bibliography import write_citations
+
+    result = BuildResult(output_dir=output_dir)
+    print(f"  {_DIM}[1/1]{_RESET} typst compile ...")
+    run_typst(config, main, output_dir, env)
+    result.log = output_dir / f"{main}.log"
+    deps = output_dir / f"{main}.deps"
+    result.deps = deps if deps.is_file() else None
+    result.cites = write_citations(config, main, output_dir)
+    return result
+
+
 def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
     """Orchestrate the full build for one main: N LaTeX passes with bibtex/biber after pass 1."""
     if main is None:
@@ -112,7 +178,7 @@ def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
     output_dir = root / config.output_dir / main
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    tex_file = root / f"{main}.tex"
+    tex_file = config.main_file(main)
     result = BuildResult(output_dir=output_dir)
 
     # One timestamp for the whole pipeline, so rebuilds are byte-identical.
@@ -120,6 +186,10 @@ def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
     if source_date.warning:
         print(f"  {_DIM}warning: {source_date.warning}{_RESET}")
     env = reproducible.build_env(source_date)
+
+    if config.is_typst:
+        result = _build_typst(config, main, output_dir, env)
+        return _finish(config, main, output_dir, result)
     prelude = (
         reproducible.trailer_id_code(config.engine, source_date, main)
         if reproducible.needs_trailer_id(config.engine)
@@ -157,7 +227,6 @@ def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
         )
 
     # Check outputs
-    pdf_path = output_dir / f"{main}.pdf"
     log_path = output_dir / f"{main}.log"
     blg_path = output_dir / f"{main}.blg"
     aux_path = output_dir / f"{main}.aux"
@@ -165,6 +234,16 @@ def build_paper(config: PaperkitConfig, main: str | None = None) -> BuildResult:
     result.log = log_path if log_path.is_file() else None
     result.blg = blg_path if blg_path.is_file() else None
     result.aux = aux_path if aux_path.is_file() else None
+    return _finish(config, main, output_dir, result)
+
+
+def _finish(
+    config: PaperkitConfig, main: str, output_dir: Path, result: BuildResult
+) -> BuildResult:
+    """Record the PDF, copy it to the root, and export the texts; common to both engines."""
+    root = config.root
+    pdf_path = output_dir / f"{main}.pdf"
+    log_path = output_dir / f"{main}.log"
 
     if pdf_path.is_file():
         result.pdf = pdf_path

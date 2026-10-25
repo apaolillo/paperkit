@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from paperkit import pages, texlive
+from paperkit import pages, texlive, typst
 from paperkit.builder import BuildResult
 from paperkit.config import PaperkitConfig
 
@@ -40,18 +40,49 @@ class CheckResult:
     show_details: bool = False
 
 
-def _collect_tex_files(config: PaperkitConfig) -> list[Path]:
-    """Collect all .tex files from content_dirs + every main .tex."""
+def _collect_source_files(config: PaperkitConfig) -> list[Path]:
+    """Every source of the engine's kind under content_dirs, plus each main."""
+    suffix = config.main_suffix
     files: list[Path] = []
     for d in config.content_dirs:
-        tex_dir = config.root / d
-        if tex_dir.is_dir():
-            files.extend(sorted(tex_dir.rglob("*.tex")))
+        src_dir = config.root / d
+        if src_dir.is_dir():
+            files.extend(sorted(src_dir.rglob(f"*{suffix}")))
     for main in config.mains or [config.main]:
-        main_tex = config.root / f"{main}.tex"
-        if main_tex.is_file():
-            files.append(main_tex)
+        main_file = config.main_file(main)
+        if main_file.is_file():
+            files.append(main_file)
     return files
+
+
+_TYPST_DIAGNOSTIC_RE = re.compile(
+    r"^(?:(?P<where>.+?:\d+:\d+): )?(?P<level>error|warning): (?P<msg>.*)$"
+)
+
+
+def check_typst_log(log_path: Path | None) -> CheckResult:
+    """Parse the diagnostics typst printed, kept behind the banner in <main>.log."""
+    result = CheckResult(name="Typst")
+    if not log_path or not log_path.is_file():
+        return result
+    lines = log_path.read_text(errors="replace").splitlines()[1:]  # first line: the banner
+    errors = [
+        m for line in lines if (m := _TYPST_DIAGNOSTIC_RE.match(line)) and m["level"] == "error"
+    ]
+    warnings = [
+        m for line in lines if (m := _TYPST_DIAGNOSTIC_RE.match(line)) and m["level"] == "warning"
+    ]
+    if errors:
+        result.status = CheckStatus.ERROR
+        result.messages.append(f"{len(errors)} error(s), {len(warnings)} warning(s)")
+        result.messages.extend(f"  {m.group(0)}" for m in errors)
+    elif warnings:
+        result.status = CheckStatus.WARNING
+        result.messages.append(f"{len(warnings)} warning(s)")
+        result.messages.extend(f"  {m.group(0)}" for m in warnings)
+    else:
+        result.messages.append("clean")
+    return result
 
 
 def check_log_errors(log_path: Path, label: str) -> CheckResult:
@@ -283,8 +314,33 @@ def _write_font_report(
 
 
 def check_toolchain(config: PaperkitConfig, log_path: Path | None) -> CheckResult:
-    """Check the PDF was built with the TeX Live that [texlive] configures."""
+    """Check the PDF was built with the toolchain the config pins.
+
+    For Typst that is the pinned release; for LaTeX, the upstream TeX Live
+    of [texlive], which is the only LaTeX case with an expectation to check.
+    """
     result = CheckResult(name="Toolchain")
+    if config.is_typst:
+        first = (
+            log_path.read_text(errors="replace").splitlines()[:1]
+            if log_path and log_path.is_file()
+            else []
+        )
+        version = typst.parse_banner(first[0]) if first else None
+        if version is None:
+            result.status = CheckStatus.SKIPPED
+            result.messages.append("Skipped (no typst banner in the build log)")
+            return result
+        mismatch = typst.toolchain_mismatch(config.typst, version)
+        if mismatch:
+            result.status = CheckStatus.WARNING
+            result.messages.append(f"PDF not built with the pinned typst: {mismatch}")
+            result.messages.append(
+                "  was it built outside the paperkit image (e.g. `paperkit build --no-docker`)?"
+            )
+        else:
+            result.messages.append(f"typst {version} (pinned)")
+        return result
     banner = texlive.read_log_banner(log_path)
     if banner is None:
         result.status = CheckStatus.SKIPPED
@@ -304,9 +360,9 @@ def check_toolchain(config: PaperkitConfig, log_path: Path | None) -> CheckResul
 
 
 def check_non_ascii(config: PaperkitConfig) -> CheckResult:
-    """Flag non-ASCII characters in source .tex files."""
+    """Flag non-ASCII characters in the sources."""
     result = CheckResult(name="Non-ASCII")
-    tex_files = _collect_tex_files(config)
+    tex_files = _collect_source_files(config)
     bad_files: list[tuple[str, list[str]]] = []
 
     for tf in tex_files:
@@ -320,7 +376,7 @@ def check_non_ascii(config: PaperkitConfig) -> CheckResult:
             bad_files.append((str(rel), hits))
 
     if not bad_files:
-        result.messages.append("All source .tex files are ASCII-clean")
+        result.messages.append(f"All source {config.main_suffix} files are ASCII-clean")
     else:
         result.status = CheckStatus.WARNING
         for relpath, hits in bad_files:
@@ -331,9 +387,9 @@ def check_non_ascii(config: PaperkitConfig) -> CheckResult:
 
 
 def check_trailing_whitespace(config: PaperkitConfig) -> CheckResult:
-    """Check for trailing whitespace in source .tex files."""
+    """Check for trailing whitespace in the sources."""
     result = CheckResult(name="Trailing whitespace")
-    tex_files = _collect_tex_files(config)
+    tex_files = _collect_source_files(config)
     total = 0
     file_counts: list[tuple[str, int]] = []
 
@@ -357,9 +413,9 @@ def check_trailing_whitespace(config: PaperkitConfig) -> CheckResult:
 
 
 def check_final_newline(config: PaperkitConfig) -> CheckResult:
-    """Check that each .tex file ends with exactly one newline."""
+    """Check that each source file ends with exactly one newline."""
     result = CheckResult(name="Final newline")
-    tex_files = _collect_tex_files(config)
+    tex_files = _collect_source_files(config)
     issues: list[str] = []
 
     for tf in tex_files:
@@ -373,7 +429,7 @@ def check_final_newline(config: PaperkitConfig) -> CheckResult:
             issues.append(f"{rel}: multiple trailing newlines")
 
     if not issues:
-        result.messages.append("All source .tex files end with a single newline")
+        result.messages.append(f"All source {config.main_suffix} files end with a single newline")
     else:
         result.status = CheckStatus.WARNING
         result.messages.extend(issues)
@@ -453,9 +509,16 @@ def check_pages(config: PaperkitConfig, build_result: BuildResult) -> CheckResul
     return result
 
 
+def _is_hayagriva(bib: str) -> bool:
+    return bib.lower().endswith((".yml", ".yaml"))
+
+
 def check_bibtex_tidy(config: PaperkitConfig) -> CheckResult:
     """Run bibtex-tidy in dry-run mode and check for differences."""
     result = CheckResult(name="BibTeX tidy")
+    if config.bib and _is_hayagriva(config.bib):
+        result.messages.append("Skipped (Hayagriva bibliography, not BibTeX)")
+        return result
 
     if not config.checks.bibtex_tidy.enabled:
         result.messages.append("Disabled")
@@ -531,18 +594,24 @@ def run_all_checks(
     """
     results: list[CheckResult] = []
 
-    # Log checks (always run)
-    if build_result.log:
-        results.append(check_log_errors(build_result.log, "LaTeX"))
-    if build_result.blg:
-        bib_label = "Biber" if config.biber else "BibTeX"
-        results.append(check_log_errors(build_result.blg, bib_label))
-
-    if config.texlive.source == "upstream":
+    if config.is_typst:
+        # One compiler, one pass: its diagnostics, and the version that ran.
+        # Typst has no boxes to overflow, so that check does not apply.
+        results.append(check_typst_log(build_result.log))
         results.append(check_toolchain(config, build_result.log))
+    else:
+        # Log checks (always run)
+        if build_result.log:
+            results.append(check_log_errors(build_result.log, "LaTeX"))
+        if build_result.blg:
+            bib_label = "Biber" if config.biber else "BibTeX"
+            results.append(check_log_errors(build_result.blg, bib_label))
 
-    if config.checks.overfull_boxes:
-        results.append(check_overfull_boxes(build_result.log))
+        if config.texlive.source == "upstream":
+            results.append(check_toolchain(config, build_result.log))
+
+        if config.checks.overfull_boxes:
+            results.append(check_overfull_boxes(build_result.log))
 
     if config.checks.font_embedding:
         results.append(check_font_embedding(build_result.pdf, config.checks.no_type3))

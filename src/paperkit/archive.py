@@ -126,7 +126,12 @@ def create_zip(config: PaperkitConfig, include_bbl: bool | None = None) -> ZipRe
     # Resolved before the old archive is removed, so a missing .bbl leaves it
     # in place. The exclude patterns do not apply: these are asked for by name.
     wanted = config.zip.include_bbl if include_bbl is None else include_bbl
-    bbl_entries, warnings = _bbl_entries(config, files) if wanted else ({}, [])
+    warnings: list[str] = []
+    bbl_entries: dict[str, Path] = {}
+    if wanted and config.is_typst:
+        warnings.append("include_bbl ignored: a Typst build carries its bibliography in the PDF")
+    elif wanted:
+        bbl_entries, warnings = _bbl_entries(config, files)
 
     # Entry metadata is normalized to the build timestamp, so the same sources
     # archive to the same bytes on another machine or a fresh clone, where the

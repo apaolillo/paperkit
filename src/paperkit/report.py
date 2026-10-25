@@ -7,7 +7,7 @@ import re
 import shutil
 import subprocess
 
-from paperkit import reproducible, texlive
+from paperkit import reproducible, texlive, typst
 from paperkit.builder import BuildResult
 from paperkit.checks import CheckResult, CheckStatus
 from paperkit.config import PaperkitConfig
@@ -52,19 +52,36 @@ def get_environment_info(config: PaperkitConfig, build_result: BuildResult) -> d
 
     # The log banner names the engine that produced the PDF, wherever this
     # report runs; probing the engine on PATH is only a fallback.
-    banner = texlive.read_log_banner(build_result.log)
-    if banner:
-        info["TeX Live"] = str(banner)
-    elif shutil.which(config.engine):
-        proc = subprocess.run([config.engine, "--version"], capture_output=True, text=True)
-        if proc.stdout:
-            first = proc.stdout.splitlines()[0]
-            info["TeX Live"] = f"{first} (host {config.engine}, no build log)"
-    if config.texlive.source == "upstream":
-        info["TeX Live source"] = texlive.describe(config.texlive)
+    if config.is_typst:
+        head = ""
+        if build_result.log and build_result.log.is_file():
+            lines = build_result.log.read_text(errors="replace").splitlines()
+            head = lines[0] if lines else ""
+        version = typst.parse_banner(head)
+        if version:
+            info["Typst"] = f"typst {version} (config pins {config.typst.version})"
+        elif shutil.which("typst"):
+            proc = subprocess.run(["typst", "--version"], capture_output=True, text=True)
+            info["Typst"] = f"{proc.stdout.strip()} (host typst, no build log)"
+    else:
+        banner = texlive.read_log_banner(build_result.log)
+        if banner:
+            info["TeX Live"] = str(banner)
+        elif shutil.which(config.engine):
+            proc = subprocess.run([config.engine, "--version"], capture_output=True, text=True)
+            if proc.stdout:
+                first = proc.stdout.splitlines()[0]
+                info["TeX Live"] = f"{first} (host {config.engine}, no build log)"
+        if config.texlive.source == "upstream":
+            info["TeX Live source"] = texlive.describe(config.texlive)
     info["Source date"] = str(reproducible.resolve(config.source_date_epoch, config.root))
 
-    if config.profile_name == "acm" and build_result.log and build_result.log.is_file():
+    if (
+        config.profile_name == "acm"
+        and not config.is_typst
+        and build_result.log
+        and build_result.log.is_file()
+    ):
         text = build_result.log.read_text(errors="replace")
         m = re.search(r"acmart (\d{4}/\d{2}/\d{2} v[\d.]+)", text)
         info["acmart"] = m.group(1) if m else "not found"
@@ -107,7 +124,8 @@ def print_report(
     print(verdict)
 
     # Log location
-    print(f"  {_styled(f'Logs: {build_result.output_dir}/*.log, *.blg', _DIM)}")
+    logs = "*.log" if build_result.blg is None else "*.log, *.blg"
+    print(f"  {_styled(f'Logs: {build_result.output_dir}/{logs}', _DIM)}")
     print()
 
 

@@ -138,13 +138,13 @@ def test_sources_are_the_content_dirs_and_the_mains(tmp_path: Path) -> None:
             "elsewhere/c.tex": "ignored\n",
         },
     )
-    files = [str(f.relative_to(tmp_path)) for f in checks._collect_tex_files(cfg)]
+    files = [str(f.relative_to(tmp_path)) for f in checks._collect_source_files(cfg)]
     assert files == ["content/a.tex", "content/deep/b.tex", "paper.tex"]
 
 
 def test_missing_content_dir_and_main_are_tolerated(tmp_path: Path) -> None:
     cfg = _project(tmp_path)
-    assert checks._collect_tex_files(cfg) == []
+    assert checks._collect_source_files(cfg) == []
     assert check_non_ascii(cfg).status == CheckStatus.CLEAN
 
 

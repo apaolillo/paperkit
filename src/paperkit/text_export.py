@@ -125,6 +125,9 @@ def write_text_exports(config: PaperkitConfig, main: str, output_dir: Path) -> T
     can show why nothing appeared. Never raises; the build is unaffected.
     """
     result = TextExportResult()
+    if config.is_typst:
+        result.warnings.append("title.txt/abstract.txt skipped: not available for Typst yet")
+        return result
     main_tex = config.root / f"{main}.tex"
     if not main_tex.is_file():
         result.warnings.append(f"title.txt/abstract.txt skipped: {main}.tex not found")

@@ -411,14 +411,25 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     if not raw_patterns:
         raw_patterns = ["main"]
 
+    # The engine decides what a main is called, so it is read before the
+    # names are expanded; the rest of [build] follows below.
+    build = raw.get("build", {})
+    if "engine" in build:
+        cfg.engine = build["engine"]
+    if cfg.engine not in ENGINES:
+        raise ValueError(
+            f"[build] engine: expected one of {', '.join(ENGINES)}, got {cfg.engine!r}"
+        )
+    suffix = cfg.main_suffix
+
     expanded: list[str] = []
     seen: set[str] = set()
     for pat in raw_patterns:
         if any(c in pat for c in "*?["):
-            matches = sorted(p.stem for p in cfg.root.glob(f"{pat}.tex"))
+            matches = sorted(p.stem for p in cfg.root.glob(f"{pat}{suffix}"))
             if not matches:
                 raise FileNotFoundError(
-                    f"[project] '{pat}' matched no .tex files in {cfg.root}",
+                    f"[project] '{pat}' matched no {suffix} files in {cfg.root}",
                 )
             for m in matches:
                 if m not in seen:
@@ -432,14 +443,9 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     cfg.main = expanded[0]
 
     # [build]
-    build = raw.get("build", {})
-    for key in ("engine", "passes", "shell_escape", "bibtex", "biber", "output_dir", "jobs"):
+    for key in ("passes", "shell_escape", "bibtex", "biber", "output_dir", "jobs"):
         if key in build:
             setattr(cfg, key, build[key])
-    if cfg.engine not in ENGINES:
-        raise ValueError(
-            f"[build] engine: expected one of {', '.join(ENGINES)}, got {cfg.engine!r}"
-        )
     if "source_date_epoch" in build:
         cfg.source_date_epoch = reproducible.parse_setting(build["source_date_epoch"])
 
