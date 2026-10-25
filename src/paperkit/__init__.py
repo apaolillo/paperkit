@@ -3,4 +3,4 @@
 
 """paperkit: reproducible builds and pre-submission checks for research papers."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

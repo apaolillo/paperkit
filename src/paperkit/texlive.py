@@ -32,10 +32,10 @@ LIVE_REPOSITORY = "https://mirror.ctan.org/systems/texlive/tlnet"
 # tested against, so a new project is reproducible without a network lookup
 # at init time. Bumped per release; `paperkit texlive-update` moves a project
 # to a newer one.
-KNOWN_GOOD_SNAPSHOT = "2026-10-22"
+KNOWN_GOOD_SNAPSHOT = "2026-10-25"
 KNOWN_GOOD_TLPDB_SHA512 = (
-    "f336dd94d49ed76337fb4a5b3c7614e6072c46c6c956692d40019c5879e62acf"
-    "2c928fd9bc72863eb8874f6e8654e9e529a18271c7c27de4dd69e7a0299c97ca"
+    "da7154dcba9e415aacd31e2cd6f4a75764b8c788a5c0a125109429f1ed556a3f"
+    "cb8546216e1bab316594cc85f1618b0af70a7ab86d1fab2af7a5e0e211eb9f39"
 )
 # Enough for a typical paper: the classes publishers use, their fonts, and
 # the usual maths, graphics and bibliography packages.

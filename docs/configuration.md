@@ -307,8 +307,8 @@ image_name = "mypaper-builder"
 
 [texlive]
 source = "upstream"
-snapshot = "2026-10-22"
-tlpdb_sha512 = "f336dd94..."
+snapshot = "2026-10-25"
+tlpdb_sha512 = "da7154dc..."
 scheme = "small"
 collections = ["latexextra", "fontsrecommended", "fontsextra", "publishers"]
 

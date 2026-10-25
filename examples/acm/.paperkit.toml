@@ -54,8 +54,8 @@ extra_packages = []
 # values to the newest snapshot; `paperkit init` writes the one verified for
 # the installed paperkit.
 source = "upstream"
-snapshot = "2026-10-22"
-tlpdb_sha512 = "f336dd94d49ed76337fb4a5b3c7614e6072c46c6c956692d40019c5879e62acf2c928fd9bc72863eb8874f6e8654e9e529a18271c7c27de4dd69e7a0299c97ca"
+snapshot = "2026-10-25"
+tlpdb_sha512 = "da7154dcba9e415aacd31e2cd6f4a75764b8c788a5c0a125109429f1ed556a3fcb8546216e1bab316594cc85f1618b0af70a7ab86d1fab2af7a5e0e211eb9f39"
 # scheme-small plus the collections a paper needs. acmart is in publishers,
 # its fonts in fontsextra, booktabs in latexextra, TikZ in pictures.
 scheme = "small"
