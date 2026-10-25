@@ -31,6 +31,26 @@ the [roadmap](ROADMAP.md).
   pasting into submission forms.
 - **Profiles**: defaults per publisher (base and ACM so far).
 
+## Why paperkit
+
+Plenty of tools build LaTeX. paperkit sits one level up from them, and most
+projects will use it next to one of these rather than instead of it.
+
+| Tool | What it is | Where paperkit differs |
+|---|---|---|
+| **latexmk**, **arara** | Build automation: run the engine and BibTeX until the document is stable, driven by flags or by directives in the source | paperkit runs that loop too, but inside a container with a pinned TeX Live, and goes on to check the result and package the submission. It is not a build *rule* system; a project that needs one can still call `latexmk` on the host. |
+| **Tectonic** | A self-contained XeTeX engine that fetches packages on demand from a pinned bundle, reproducible by design | The same goal for the engine, reached differently: Tectonic replaces TeX Live with its own bundle and offers XeTeX only; paperkit keeps the stock engines, pdflatex included, which most venue classes assume, and pins a dated TeX Live snapshot instead. Nothing in Tectonic covers the checks or the archive. |
+| **Island of TeX** and other **TeX Live images** | Ready-made Docker images, one per TeX Live release | The closest thing to paperkit's image layer, and a fine way to get a pinned TeX Live. paperkit composes its image from the project's config instead, adds the check tools (poppler, bibtex-tidy, pandoc), pins by date rather than by yearly release, and then does something with the image: builds, checks, exits with a verdict. |
+| **Overleaf** | The editor, the collaboration, and a compile button | Not a competitor: paperkit works on the git clone of an Overleaf project, as a local build that is byte-reproducible and a pre-submission check Overleaf does not run. The config file lives in the project, so every co-author gets the same build. |
+
+What none of the above do, and paperkit does: tell you *before* submission
+that a figure carries a Type 3 font, that you are one page over once the
+acknowledgments are counted the way the venue counts them, that three
+bibliography entries are never cited, and that the archive you are about to
+upload would compile without BibTeX. Those are the things that come back
+from a publisher as a rejected camera-ready, and each is cheap to check once
+a build is reproducible.
+
 ## Installation
 
 Requires Python 3.12+ and, for container builds, Docker.
