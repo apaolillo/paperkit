@@ -43,8 +43,10 @@ def test_root_is_the_config_directory(tmp_path: Path) -> None:
 # -- defaults and [project] ------------------------------------------------------------
 
 
-def test_empty_file_gives_the_documented_defaults(tmp_path: Path) -> None:
-    cfg = load_config(_write(tmp_path, ""))
+def test_the_documented_defaults(tmp_path: Path) -> None:
+    # Under the base profile, which adds nothing but the zip patterns, so the
+    # dataclass defaults show through.
+    cfg = load_config(_write(tmp_path, '[profile]\nname = "base"\n'))
     assert (cfg.main, cfg.mains) == ("main", ["main"])
     assert cfg.content_dirs == ["content"]
     assert cfg.bib == ""
@@ -56,7 +58,11 @@ def test_empty_file_gives_the_documented_defaults(tmp_path: Path) -> None:
     assert cfg.page_limits.total is None
     assert cfg.zip.name == "main"
     assert cfg.zip.exclude == ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
-    assert cfg.profile_name == "acm"
+    assert cfg.zip.include_bbl is False
+
+
+def test_the_profile_defaults_to_acm(tmp_path: Path) -> None:
+    assert load_config(_write(tmp_path, "")).profile_name == "acm"
 
 
 def test_main_and_mains_are_merged_in_order_without_duplicates(tmp_path: Path) -> None:

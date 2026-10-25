@@ -7,7 +7,8 @@ and the checks reading a real PDF.
 | Paper | What it is for |
 |---|---|
 | `minimal` | The smallest thing paperkit can build: one file, no bibliography. Everything clean. |
-| `acmart` | A realistic venue class with a bibliography and a citation. Everything clean. |
+| `acmart` | A realistic venue class with a bibliography and a citation, under the `acm` profile. Everything clean. |
+| `ieee` | The same for IEEEtran, under the `ieee` profile. Everything clean. |
 | `warnings` | Trips every warning-level check and goes over its page limit, without a single error. |
 
 `warnings` is the interesting one. It contains, on purpose: a line with

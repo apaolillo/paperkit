@@ -17,11 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A `[profile] name` that matches no profile is now an error naming the
   known ones; it used to fall back silently to `base`.
+- Profiles now carry configuration defaults, applied underneath
+  `.paperkit.toml`. `acm` ships `acmart.cls`, `ACM-Reference-Format.bst` and
+  the compiled `.bbl` in the archive, builds with four passes, and counts the
+  acknowledgments as content; `base` ships the main files, `content/`, every
+  `.bib` and `*.sty` where the archive used to be empty without `[zip]
+  include`. A key the file sets still wins.
 
 ### Added
 
 - `--strict` on `paperkit build` and `paperkit check`: warnings, skipped
   checks and page-limit overruns then fail the run too.
+- An `ieee` profile for the IEEEtran class: ships `IEEEtran.cls`,
+  `IEEEtran.bst` and the `.bbl`, as PDF eXpress compiles without BibTeX.
+  `paperkit init --profile NAME` validates the name and writes the profile's
+  defaults into the generated file.
 
 ### Fixed
 

@@ -118,7 +118,7 @@ exclude = ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
 include_bbl = false         # also ship each main's compiled bibliography
 
 [profile]
-name = "base"               # base | acm
+name = "base"               # base | acm | ieee
 ```
 
 ## Commands
@@ -215,11 +215,22 @@ shipping an archive that cannot be compiled, and if a `.bbl` is older than its
 
 ## Profiles
 
-**`base`**: sensible defaults for any paper. With `sort = false` the two
-reordering arguments (`--sort=key`, `--sort-fields`) are dropped and the rest
-still applies. Default bibtex-tidy args: `--curly --blank-lines --sort=key --duplicates=key,doi,citation --no-escape --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`.
+A profile carries what a venue's document class implies, as defaults under
+your `.paperkit.toml`: anything the file sets wins.
 
-**`acm`**: for ACM conferences and journals. Currently identical to base; reserved for future ACM-specific defaults.
+- **`base`**: ships the main files, `content/`, every `.bib` and `*.sty` in
+  the archive; bibtex-tidy with `--curly --blank-lines --sort=key --duplicates=key,doi,citation --no-escape --sort-fields --trailing-commas --remove-empty-fields --enclosing-braces=title --align=13`
+  (`sort = false` drops the two reordering arguments).
+- **`acm`** (the default): also ships `acmart.cls`, `ACM-Reference-Format.bst`
+  and the compiled `.bbl`, as TAPS compiles without BibTeX; builds with four
+  passes so `pbalance` can balance the last page; counts the acknowledgments
+  as content, as ACM calls do.
+- **`ieee`**: also ships `IEEEtran.cls`, `IEEEtran.bst` and the `.bbl`, as PDF
+  eXpress compiles without BibTeX.
+
+`paperkit init --profile ieee` writes the profile's values into the generated
+file, so nothing is hidden behind the name. The exact defaults are listed in
+the [configuration reference](https://github.com/apaolillo/paperkit/blob/main/docs/configuration.md).
 
 ## Docker
 

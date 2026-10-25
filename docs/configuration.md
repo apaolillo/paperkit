@@ -205,10 +205,32 @@ sources zip to the same bytes on another machine.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `name` | string | `"acm"` | `base` or `acm` |
+| `name` | string | `"acm"` | `base`, `acm` or `ieee` |
 
-A profile carries venue-specific defaults. `base` suits any paper; `acm` is
-currently identical to it and reserved for ACM-specific defaults.
+A profile carries what a venue's document class implies for a project, as
+defaults laid underneath the file: a key the file sets wins, and a list the
+file sets replaces the profile's list rather than merging with it.
+
+| Profile | Sets, unless the file does |
+|---|---|
+| `base` | `[zip] include = ["{main}.tex", "content/**/*.tex", "**/*.bib", "*.sty"]` |
+| `acm` | base's list plus `acmart.cls` and `ACM-Reference-Format.bst`; `[zip] include_bbl = true`; `[build] passes = 4`; `[page_limits] ack_counts_as_content = true` |
+| `ieee` | base's list plus `IEEEtran.cls` and `IEEEtran.bst`; `[zip] include_bbl = true` |
+
+The reasoning: ACM's TAPS and IEEE's PDF eXpress both compile the submitted
+sources without running BibTeX, so the archive must carry the `.bbl`, and a
+project that pins its own copy of the class or style file must ship it, while
+a pattern matching no file is simply skipped. The fourth pass lets acmart's
+`pbalance` balance the last page, and ACM calls state the page limit for the
+body with acknowledgments inside it. IEEE page rules vary by conference, so
+the `ieee` profile leaves `[page_limits]` alone.
+
+Because `acm` and `ieee` default `include_bbl` to true, `paperkit zip` in such
+a project needs a build first, or `--no-bbl`.
+
+`paperkit init --profile NAME` writes these values out explicitly, so the
+generated file shows what a build will do rather than hiding it behind the
+profile name.
 
 ## A complete example
 

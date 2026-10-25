@@ -1,0 +1,13 @@
+# A realistic venue class with a bibliography: IEEEtran plus bibtex, under
+# the ieee profile.
+[project]
+main = "paper"
+content_dirs = ["."]
+bib = "refs.bib"
+
+[build]
+shell_escape = false
+bibtex = true
+
+[profile]
+name = "ieee"

@@ -37,9 +37,8 @@ def test_config_reads_sort(tmp_path: Path) -> None:
     )
     cfg = load_config(cfg_path)
     assert cfg.checks.bibtex_tidy.sort is False
-    assert set(get_profile(cfg).bibtex_tidy_args(sort=cfg.checks.bibtex_tidy.sort)).isdisjoint(
-        BaseProfile.SORT_ARGS,
-    )
+    args = get_profile(cfg.profile_name).bibtex_tidy_args(sort=cfg.checks.bibtex_tidy.sort)
+    assert set(args).isdisjoint(BaseProfile.SORT_ARGS)
 
 
 def test_config_rejects_non_boolean_sort(tmp_path: Path) -> None:

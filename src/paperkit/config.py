@@ -8,8 +8,10 @@ import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from paperkit import reproducible
+from paperkit.profiles import get_profile
 
 
 @dataclass
@@ -303,11 +305,30 @@ def find_config(start: Path | None = None) -> Path:
         d = parent
 
 
+def _with_profile_defaults(raw: dict[str, Any]) -> dict[str, Any]:
+    """Lay the profile's defaults under the file's own tables.
+
+    Resolved before anything else is parsed, so a default reads exactly as
+    if it had been written in .paperkit.toml, and the file's own keys win.
+    """
+    profile = raw.get("profile", {})
+    name = profile.get("name", PaperkitConfig.profile_name) if isinstance(profile, dict) else None
+    if not isinstance(name, str):
+        raise ValueError("[profile] name: expected a string")
+    merged = dict(raw)
+    for section, keys in get_profile(name).defaults().items():
+        table = dict(merged.get(section, {}))
+        for key, value in keys.items():
+            table.setdefault(key, value)
+        merged[section] = table
+    return merged
+
+
 def load_config(path: Path | None = None) -> PaperkitConfig:
     """Load .paperkit.toml and return a PaperkitConfig."""
     if path is None:
         path = find_config()
-    raw = tomllib.loads(path.read_text())
+    raw = _with_profile_defaults(tomllib.loads(path.read_text()))
 
     cfg = PaperkitConfig(root=path.parent.resolve())
 

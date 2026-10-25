@@ -4,6 +4,7 @@
 """Click CLI entry point for paperkit."""
 
 import io
+import json
 import os
 import shlex
 import sys
@@ -48,14 +49,11 @@ def main(ctx: click.Context, config_path: Path | None, verbose: bool) -> None:
 def _get_config(ctx: click.Context) -> PaperkitConfig:
     """Load the project config, or exit with the problem rather than a traceback.
 
-    The profile is resolved here too, so a wrong `[profile] name` fails every
-    command up front instead of the first one that happens to need it.
+    A wrong `[profile] name` fails here too, since the loader resolves the
+    profile for its defaults before anything else.
     """
-    from paperkit.profiles import get_profile
-
     try:
         config = load_config(ctx.obj.get("config_path"))
-        get_profile(config)
     except (ValueError, FileNotFoundError) as e:
         click.echo(f"error: {e}", err=True)
         sys.exit(1)
@@ -489,7 +487,7 @@ def _tidy_host(config: PaperkitConfig) -> None:
         click.echo("bibtex-tidy not found. Install it with: npm install -g bibtex-tidy")
         sys.exit(1)
 
-    profile = get_profile(config)
+    profile = get_profile(config.profile_name)
     sort = config.checks.bibtex_tidy.sort
     tidy_args = profile.bibtex_tidy_args(sort=sort)
 
@@ -592,8 +590,19 @@ collections = [{collections}]
 """
 
 
+def _profile_choices() -> list[str]:
+    from paperkit.profiles import profile_names
+
+    return profile_names()
+
+
 @main.command()
-@click.option("--profile", default="acm", help="Profile to use (default: acm)")
+@click.option(
+    "--profile",
+    type=click.Choice(_profile_choices()),
+    default="acm",
+    help="Venue profile the defaults come from (default: acm)",
+)
 @click.option(
     "--texlive",
     "texlive_mode",
@@ -602,7 +611,18 @@ collections = [{collections}]
     help="TeX Live source for the new project (default: snapshot)",
 )
 def init(profile: str, texlive_mode: str) -> None:
-    """Generate a .paperkit.toml template."""
+    """Generate a .paperkit.toml template.
+
+    The values the profile would apply anyway are written out, so the file
+    shows what a build will do instead of hiding it behind the profile name.
+    """
+    from paperkit.profiles import get_profile
+
+    d = get_profile(profile).defaults()
+    passes = d.get("build", {}).get("passes", 3)
+    includes = "".join(f"    {json.dumps(i)},\n" for i in d["zip"]["include"])
+    include_bbl = json.dumps(d["zip"].get("include_bbl", False))
+    acks = json.dumps(d.get("page_limits", {}).get("ack_counts_as_content", False))
     template = f"""[project]
 main = "main"                              # main .tex file (without extension)
 content_dirs = ["content"]
@@ -610,7 +630,7 @@ bib = "references.bib"
 
 [build]
 engine = "pdflatex"
-passes = 3
+passes = {passes}
 shell_escape = true
 bibtex = true
 output_dir = "out"
@@ -638,20 +658,20 @@ bibtex_tidy = {{ enabled = true, version = "1.14.0" }}
 # total = 14            # max total pages (incl. references)
 # before_refs = 12      # content before references must fit in 12 pages
 # before_ack = 13       # content before acknowledgments must fit in 13 pages
-# ack_counts_as_content = false   # true: acknowledgments count toward
+# ack_counts_as_content = {acks}   # true: acknowledgments count toward
 #                                 # before_refs, as at venues that exempt
 #                                 # only the references
 
+# What the "{profile}" profile ships by default; patterns matching no file
+# are skipped, so the class files only travel when the project carries them.
 [zip]
 name = "main"
 include = [
-    "{{main}}.tex",
-    "content/*.tex",
-]
+{includes}]
 exclude = ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
 # Ship each main's compiled bibliography (<main>.bbl) next to its .tex, for
-# publishers that compile without running BibTeX (e.g. Springer LNCS).
-include_bbl = false
+# publishers that compile without running BibTeX.
+include_bbl = {include_bbl}
 
 [profile]
 name = "{profile}"

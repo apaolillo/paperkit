@@ -151,7 +151,7 @@ def make_builder(config: PaperkitConfig) -> UbuntuDockerBuilder:
     """Assemble the image definition (Dockerfile + build context) for *config*."""
     from paperkit.profiles import get_profile
 
-    profile = get_profile(config)
+    profile = get_profile(config.profile_name)
     tl = config.texlive
 
     builder = UbuntuDockerBuilder(
