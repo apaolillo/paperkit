@@ -1,0 +1,55 @@
+name: release
+
+# Pushing a version tag builds the distributions on a clean runner, checks
+# them, and publishes them to PyPI through Trusted Publishing: GitHub proves
+# to PyPI which repository and workflow is uploading, so no API token exists
+# anywhere, and PyPI records a provenance attestation for each file.
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build from the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Build the distributions
+        run: uv build
+      - name: Check the metadata PyPI will render
+        run: uvx twine check dist/*
+      - name: The version in the package must be the version in the tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(uvx --from ./dist/*.whl paperkit --version | awk '{print $NF}')
+          echo "tag ${tag}, package ${version}"
+          test "${tag}" = "${version}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # The environment is what PyPI's trusted publisher is bound to; protect
+    # it on GitHub (required reviewers) to put a human between tag and upload.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/paperkit/
+    permissions:
+      # Mint the OIDC token PyPI checks; nothing here writes to the repo.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        # Attestations (PEP 740) are generated and uploaded by default.
