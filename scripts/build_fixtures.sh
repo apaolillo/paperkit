@@ -57,10 +57,12 @@ expect() {
 expect minimal 0
 expect acmart 0
 expect ieee 0
+expect lncs 0
 if [ -z "${where}" ]; then
     expect minimal 0 --strict
     expect acmart 0 --strict
     expect ieee 0 --strict
+    expect lncs 0 --strict
 fi
 # This one trips every warning-level check and goes over its page limit, which
 # is not an error by itself, but is one under --strict.

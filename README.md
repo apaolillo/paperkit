@@ -118,7 +118,7 @@ exclude = ["*.aux", "*.log", "*.out", "*.blg", "*.bbl"]
 include_bbl = false         # also ship each main's compiled bibliography
 
 [profile]
-name = "base"               # base | acm | ieee
+name = "base"               # base | acm | ieee | lncs
 ```
 
 ## Commands
@@ -227,6 +227,8 @@ your `.paperkit.toml`: anything the file sets wins.
   as content, as ACM calls do.
 - **`ieee`**: also ships `IEEEtran.cls`, `IEEEtran.bst` and the `.bbl`, as PDF
   eXpress compiles without BibTeX.
+- **`lncs`**: also ships `llncs.cls`, `splncs04.bst` and the `.bbl`, which
+  Springer's camera-ready checklist asks for.
 
 `paperkit init --profile ieee` writes the profile's values into the generated
 file, so nothing is hidden behind the name. The exact defaults are listed in

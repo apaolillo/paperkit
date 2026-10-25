@@ -28,10 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `--strict` on `paperkit build` and `paperkit check`: warnings, skipped
   checks and page-limit overruns then fail the run too.
-- An `ieee` profile for the IEEEtran class: ships `IEEEtran.cls`,
-  `IEEEtran.bst` and the `.bbl`, as PDF eXpress compiles without BibTeX.
-  `paperkit init --profile NAME` validates the name and writes the profile's
-  defaults into the generated file.
+- `ieee` and `lncs` profiles, for the IEEEtran and llncs classes: each ships
+  its class and style files and the compiled `.bbl`, since PDF eXpress and
+  Springer's pipeline both compile without running BibTeX. `paperkit init
+  --profile NAME` validates the name and writes the profile's defaults into
+  the generated file.
 
 ### Fixed
 

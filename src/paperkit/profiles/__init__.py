@@ -88,6 +88,8 @@ register_profile("base", BaseProfile)
 
 from paperkit.profiles.acm import ACMProfile  # noqa: E402
 from paperkit.profiles.ieee import IEEEProfile  # noqa: E402
+from paperkit.profiles.lncs import LNCSProfile  # noqa: E402
 
 register_profile("acm", ACMProfile)
 register_profile("ieee", IEEEProfile)
+register_profile("lncs", LNCSProfile)

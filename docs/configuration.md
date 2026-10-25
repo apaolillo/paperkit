@@ -205,7 +205,7 @@ sources zip to the same bytes on another machine.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `name` | string | `"acm"` | `base`, `acm` or `ieee` |
+| `name` | string | `"acm"` | `base`, `acm`, `ieee` or `lncs` |
 
 A profile carries what a venue's document class implies for a project, as
 defaults laid underneath the file: a key the file sets wins, and a list the
@@ -216,16 +216,17 @@ file sets replaces the profile's list rather than merging with it.
 | `base` | `[zip] include = ["{main}.tex", "content/**/*.tex", "**/*.bib", "*.sty"]` |
 | `acm` | base's list plus `acmart.cls` and `ACM-Reference-Format.bst`; `[zip] include_bbl = true`; `[build] passes = 4`; `[page_limits] ack_counts_as_content = true` |
 | `ieee` | base's list plus `IEEEtran.cls` and `IEEEtran.bst`; `[zip] include_bbl = true` |
+| `lncs` | base's list plus `llncs.cls` and `splncs04.bst`; `[zip] include_bbl = true` |
 
-The reasoning: ACM's TAPS and IEEE's PDF eXpress both compile the submitted
-sources without running BibTeX, so the archive must carry the `.bbl`, and a
+The reasoning: ACM's TAPS, IEEE's PDF eXpress and Springer's LNCS pipeline
+all compile the submitted sources without running BibTeX, so the archive must carry the `.bbl`, and a
 project that pins its own copy of the class or style file must ship it, while
 a pattern matching no file is simply skipped. The fourth pass lets acmart's
 `pbalance` balance the last page, and ACM calls state the page limit for the
-body with acknowledgments inside it. IEEE page rules vary by conference, so
-the `ieee` profile leaves `[page_limits]` alone.
+body with acknowledgments inside it. IEEE and LNCS page rules vary by
+conference, so those profiles leave `[page_limits]` alone.
 
-Because `acm` and `ieee` default `include_bbl` to true, `paperkit zip` in such
+Because `acm`, `ieee` and `lncs` default `include_bbl` to true, `paperkit zip` in such
 a project needs a build first, or `--no-bbl`.
 
 `paperkit init --profile NAME` writes these values out explicitly, so the
