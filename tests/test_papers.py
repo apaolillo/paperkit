@@ -18,14 +18,24 @@ NAMES = sorted(p.name for p in PAPERS.iterdir() if p.is_dir()) if PAPERS.is_dir(
 
 
 def test_the_fixtures_are_there() -> None:
-    assert NAMES == ["acmart", "ieee", "lncs", "minimal", "usenix", "warnings"]
+    assert NAMES == [
+        "acmart",
+        "ieee",
+        "lncs",
+        "minimal",
+        "typst-acm",
+        "typst-ieee",
+        "typst-minimal",
+        "usenix",
+        "warnings",
+    ]
 
 
 @pytest.mark.parametrize("name", NAMES)
 def test_each_fixture_config_loads(name: str) -> None:
     config = load_config(PAPERS / name / ".paperkit.toml")
     assert config.mains == ["paper"]
-    assert (config.root / "paper.tex").is_file()
+    assert config.main_file("paper").is_file()
     for bib in [config.bib] if config.bib else []:
         assert (config.root / bib).is_file()
 

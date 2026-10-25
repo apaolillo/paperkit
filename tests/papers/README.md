@@ -11,6 +11,9 @@ and the checks reading a real PDF.
 | `ieee` | The same for IEEEtran, under the `ieee` profile. Everything clean. |
 | `lncs` | The same for Springer's llncs, under the `lncs` profile. Everything clean. |
 | `warnings` | Trips every warning-level check and goes over its page limit, without a single error. |
+| `typst-minimal` | A plain Typst document with a bibliography. Clean. |
+| `typst-ieee` | Typst Universe's IEEE template (`charged-ieee`), under `typst-ieee`. Clean. |
+| `typst-acm` | Typst Universe's ACM template (`faithful-acmart`, sigconf), under `typst-acm`. Clean. |
 | `usenix` | A two-column article whose acknowledgments start a second page. Over its one-page budget only because the `usenix` profile counts them: `--strict` exits 1, and would not under `base`. |
 
 `warnings` is the interesting one. It contains, on purpose: a line with

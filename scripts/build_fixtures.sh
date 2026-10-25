@@ -72,6 +72,17 @@ expect warnings 1 --strict
 # acknowledgments: the profile's one default, seen end to end.
 expect usenix 0
 expect usenix 1 --strict
+# Typst: a plain document, and the IEEE and ACM templates from Universe.
+# Those two import a package, declared in their config so the image carries
+# it; on a host they download it once into typst's cache.
+expect typst-minimal 0
+expect typst-ieee 0
+expect typst-acm 0
+if [ -z "${where}" ]; then
+    expect typst-minimal 0 --strict
+    expect typst-ieee 0 --strict
+    expect typst-acm 0 --strict
+fi
 
 if [ "${failures}" -ne 0 ]; then
     echo "${failures} fixture(s) did not end as expected" >&2

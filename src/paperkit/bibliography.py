@@ -154,12 +154,18 @@ def query_citations(config: PaperkitConfig, main: str) -> dict[str, Any] | None:
         keys = subprocess.run(
             [*base, "cite", "--field", "key"], capture_output=True, text=True, check=True
         )
+        # Under some templates an `@key` is still a ref when queried, not yet a
+        # cite; its target is the key. A ref to a figure is never a bib key, so
+        # the union is a harmless superset for the unused-entry check.
+        refs = subprocess.run([*base, "ref", "--field", "target"], capture_output=True, text=True)
         full = subprocess.run(
             [*base, "bibliography", "--field", "full"], capture_output=True, text=True
         )
     except (FileNotFoundError, subprocess.CalledProcessError):
         return None
     citations = {k.strip("<>") for k in json.loads(keys.stdout or "[]")}
+    if refs.returncode == 0:
+        citations |= {k.strip("<>") for k in json.loads(refs.stdout or "[]")}
     cite_all = any(json.loads(full.stdout or "[]")) if full.returncode == 0 else False
     return {"citations": sorted(citations), "cite_all": cite_all}
 

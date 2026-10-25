@@ -1,0 +1,12 @@
+# The smallest Typst project paperkit can build: one file, a bibliography,
+# no packages. Clean.
+[project]
+main = "paper"
+content_dirs = []
+bib = "refs.bib"
+
+[build]
+engine = "typst"
+
+[profile]
+name = "typst"

@@ -66,6 +66,9 @@ include = [
 
 [tool.hatch.build]
 exclude = [
+    # Fonts a fixture paper carries for its template: a few MB that the
+    # package has no use for.
+    "/tests/papers/*/fonts",
     "/.venv*",
     "/venv*",
     "/__pycache__",

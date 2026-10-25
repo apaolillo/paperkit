@@ -1,0 +1,16 @@
+# A Typst paper in Universe's IEEE template (charged-ieee, by Typst GmbH),
+# under the typst-ieee profile. The package is declared, so the image
+# carries it and the build needs no network.
+[project]
+main = "paper"
+content_dirs = []
+bib = "refs.bib"
+
+[build]
+engine = "typst"
+
+[typst]
+packages = ["@preview/charged-ieee:0.1.4"]
+
+[profile]
+name = "typst-ieee"

@@ -1,0 +1,20 @@
+# A Typst paper in Universe's ACM template (faithful-acmart), under the
+# typst-acm profile, which counts the acknowledgments as content as ACM
+# calls do. The package is declared, so the image carries it.
+[project]
+main = "paper"
+content_dirs = []
+bib = "refs.bib"
+
+[build]
+engine = "typst"
+
+[typst]
+packages = ["@preview/faithful-acmart:0.2.0"]
+# The template needs Libertinus Sans and Math and Inconsolatazi4, which it
+# does not ship and typst does not embed (only Libertinus Serif); they come
+# with the paper, under the OFL, as its README asks.
+fonts = ["fonts"]
+
+[profile]
+name = "typst-acm"
