@@ -1,0 +1,56 @@
+# paperkit configuration for the LNCS example: a paper in Springer's llncs,
+# under the lncs profile. Every key is optional; the ones a paper in an LNCS
+# volume reaches for are written out, with the reason. The full list, with
+# every default, is docs/configuration.md.
+
+[project]
+main = "paper"
+content_dirs = ["content"]
+bib = "references.bib"
+
+[build]
+engine = "pdflatex"
+passes = 3
+shell_escape = false
+bibtex = true
+output_dir = "out"
+source_date_epoch = "git"
+
+[docker]
+image_name = "paperkit-builder"
+base_image = "ubuntu:26.04"
+extra_packages = []
+
+[checks]
+non_ascii = true
+trailing_whitespace = true
+final_newline = true
+font_embedding = true
+no_type3 = true
+overfull_boxes = true
+bibtex_tidy = { enabled = true, version = "1.14.0" }
+
+[checks.unused_bib]
+# The check stays on, and one entry is excused by key: it is kept in the
+# shared bibliography for the extended version, which cites it. Excusing by
+# key keeps the check honest for every other entry, where switching it off
+# would hide the next leftover.
+enabled = true
+ignore = ["extended"]
+
+[page_limits]
+# LNCS volumes state the limit as a count of pages including references, so
+# the cap is on the whole PDF. The number is the volume's; fifteen here.
+total = 15
+
+[zip]
+# What Springer compiles: the sources, the bibliography, and the compiled
+# .bbl next to the main file, which the camera-ready checklist asks for. The
+# lncs profile adds llncs.cls and splncs04.bst for a project carrying its
+# own copies.
+name = "paper"
+include = ["{main}.tex", "content/*.tex", "references.bib", "llncs.cls", "splncs04.bst"]
+include_bbl = true
+
+[profile]
+name = "lncs"

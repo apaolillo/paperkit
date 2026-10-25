@@ -1,7 +1,9 @@
 name: fixtures
 
 # The unit suite never runs an engine. This job does: it builds the Docker
-# image and puts the fixture papers through it the way a user's builds go.
+# images and puts the fixture papers and the examples through them the way a
+# user's builds go, the examples under --strict since they are what a new
+# user copies.
 # It installs a TeX Live, so it does not run on every push: on a schedule,
 # on demand, and when the files that only a real build can validate change.
 on:
@@ -16,6 +18,7 @@ on:
       - "src/paperkit/texlive.py"
       - "src/paperkit/profiles/**"
       - "tests/papers/**"
+      - "examples/**"
       - "scripts/build_fixtures.sh"
       - ".github/workflows/fixtures.yml"
   pull_request:
@@ -25,6 +28,7 @@ on:
       - "src/paperkit/texlive.py"
       - "src/paperkit/profiles/**"
       - "tests/papers/**"
+      - "examples/**"
       - "scripts/build_fixtures.sh"
       - ".github/workflows/fixtures.yml"
 
@@ -37,7 +41,7 @@ concurrency:
 
 jobs:
   fixtures:
-    name: build the fixture papers in Docker
+    name: build the fixture papers and the examples in Docker
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -47,8 +51,8 @@ jobs:
           enable-cache: true
       - name: Install paperkit from this checkout
         run: uv sync --locked
-      - name: Build the fixtures through the image
-        # The image is composed from the fixtures' config and holds this
+      - name: Build the fixtures and the examples through the images
+        # Each image is composed from the papers' config and holds this
         # checkout's paperkit, so this is the whole path a user takes.
         run: PAPERKIT=.venv/bin/paperkit ./scripts/build_fixtures.sh --docker
       - name: Keep the build reports
@@ -56,5 +60,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fixture-build-reports
-          path: tests/papers/*/build.out
+          path: |
+            tests/papers/*/build.out
+            examples/*/build.out
           if-no-files-found: ignore

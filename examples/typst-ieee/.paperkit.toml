@@ -1,0 +1,52 @@
+# paperkit configuration for the Typst IEEE example: Universe's charged-ieee
+# template under the typst-ieee profile. Every key is optional; the ones
+# such a paper reaches for are written out, with the reason. The full list,
+# with every default, is docs/configuration.md.
+
+[project]
+main = "paper"
+content_dirs = ["content"]
+bib = "references.bib"
+
+[build]
+engine = "typst"
+output_dir = "out"
+source_date_epoch = "git"
+
+[docker]
+image_name = "paperkit-typst-builder"
+base_image = "ubuntu:26.04"
+# The template sets TeX Gyre Termes, which Typst does not embed. The
+# typst-ieee profile installs fonts-texgyre in the image; a paper needing
+# another family lists its package here.
+extra_packages = []
+
+[typst]
+# The package the paper imports, fetched when the image is built so the
+# build needs no network. Keep it in step with the #import line.
+packages = ["@preview/charged-ieee:0.1.4"]
+# No fonts of its own: the template's font comes from the image, see
+# [docker] above. System fonts stay out of the build.
+fonts = []
+ignore_system_fonts = true
+
+[checks]
+non_ascii = true
+trailing_whitespace = true
+final_newline = true
+font_embedding = true
+no_type3 = true
+unused_bib = true
+bibtex_tidy = { enabled = true, version = "1.14.0" }
+
+[page_limits]
+# IEEE calls usually cap the whole PDF, references included.
+total = 8
+
+[zip]
+# The exact files the compilation read, from its dependency list; the
+# package itself stays out, since the publisher fetches it by the import.
+name = "paper"
+
+[profile]
+name = "typst-ieee"

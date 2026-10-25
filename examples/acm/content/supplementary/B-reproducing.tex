@@ -1,0 +1,12 @@
+\section{Reproducing the Build}
+
+The paper builds inside an image composed from the configuration file. The
+\TeX\ Live in that image is installed from a dated snapshot of the
+repository~\cite{tlnet} whose package database checksum is pinned, so a
+repository that changed fails the image build instead of producing a
+different \TeX\ Live. With the timestamp taken from the commit, two builds of
+one commit give byte-identical PDFs~\cite{reproducible}.
+
+To reproduce this document, clone the repository, enter this directory and
+run \texttt{paperkit build}. The first run builds the image; later runs reuse
+it.

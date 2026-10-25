@@ -1,0 +1,27 @@
+\section{Approach}
+
+Submission is a PDF, so the archive matters less here than at a publisher
+that compiles the sources; the base profile's patterns still gather the
+main file, the sections and the bibliography, plus any \texttt{.sty} in the
+directory, which is where USENIX's style file lives in a real project.
+
+The bibliography of this paper is kept in reading order rather than sorted
+by key. The configuration says so with \texttt{sort = false}, and the tidy
+check then holds the file to bibtex-tidy's formatting but not to its order.
+Table~\ref{tab:rule} summarizes the page rule the file encodes.
+
+\begin{table}[t]
+  \caption{The page rule for a USENIX submission, as configured.}
+  \label{tab:rule}
+  \centering
+  \footnotesize
+  \begin{tabular}{ll}
+    \toprule
+    Setting & Effect \\
+    \midrule
+    \texttt{before\_refs = 12} & the budget, in content pages \\
+    \texttt{ack\_counts\_as\_content} & the acknowledgments count \\
+    \texttt{--strict} & an overrun exits 1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

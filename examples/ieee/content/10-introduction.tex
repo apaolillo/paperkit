@@ -1,0 +1,12 @@
+\section{Introduction}
+
+IEEE conferences collect the camera-ready through PDF eXpress, which checks
+the PDF for embedded fonts and can compile the sources itself; a PDF with a
+Type 3 font, usually a plot rendered as bitmaps, is rejected at that
+step~\cite{ieeetran}. paperkit runs the same font check after every build and
+names the font and the file it came from~\cite{reproducible}.
+
+This example shows the project shape for such a paper: the sections under
+\texttt{content/}, the bibliography next to the main file, and a configuration
+that caps the total page count the way an IEEE call states it, references
+included.

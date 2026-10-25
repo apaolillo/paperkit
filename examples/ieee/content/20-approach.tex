@@ -1,0 +1,25 @@
+\section{Approach}
+
+The configuration file is the project's build instructions and its checklist
+in one place. Table~\ref{tab:config} lists what this one sets and why.
+
+\begin{table}[t]
+  \caption{What \texttt{.paperkit.toml} sets for this paper.}
+  \label{tab:config}
+  \centering
+  \footnotesize
+  \begin{tabular}{ll}
+    \toprule
+    Key & Reason \\
+    \midrule
+    \texttt{passes = 3} & settles references and citations \\
+    \texttt{no\_type3 = true} & PDF eXpress rejects bitmap fonts \\
+    \texttt{total = 8} & the call's cap, references included \\
+    \texttt{include\_bbl = true} & PDF eXpress runs no BibTeX \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The \texttt{ieee} profile supplies the last row and the class files for the
+archive; the file writes them out anyway, so that reading it tells you what
+the build does without knowing the profile.

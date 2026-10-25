@@ -1,0 +1,20 @@
+# paperkit configuration for the minimal example: the shortest project that
+# shows what paperkit does. Every key is optional, so the shortest useful
+# configuration is an empty file: one target called main, built with
+# pdflatex in Docker. This one says what is different here, and nothing
+# else; the defaults do the rest (docs/configuration.md lists them all).
+
+[project]
+main = "paper"            # paper.tex, not main.tex
+content_dirs = []         # one file, no sections directory
+# bib: unset, so there is no bibliography and the bibliography checks are
+# off; the page report still comes.
+
+[build]
+shell_escape = false      # nothing here calls an external program
+bibtex = false            # no \bibliography
+
+[profile]
+# base: no venue rules, and an archive of the main file, content/, every
+# .bib and *.sty. The default profile is acm.
+name = "base"

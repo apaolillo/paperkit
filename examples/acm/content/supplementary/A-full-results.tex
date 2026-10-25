@@ -1,0 +1,21 @@
+\section{Full Results}
+
+Table~\ref{tab:full} lists every check with the state it can be in. The paper
+only shows the result for this project; a check is also \emph{skipped} when
+the tool it needs is missing, which paperkit reports rather than hides, since
+a skipped check is not a passed one.
+
+\begin{table}[h]
+  \caption{The states a check can end in.}
+  \label{tab:full}
+  \begin{tabular}{ll}
+    \toprule
+    State & Meaning \\
+    \midrule
+    clean & ran, nothing to report \\
+    warning & ran, something to look at, the build is usable \\
+    error & ran, the PDF should not be submitted \\
+    skipped & did not run, a tool or an input is missing \\
+    \bottomrule
+  \end{tabular}
+\end{table}

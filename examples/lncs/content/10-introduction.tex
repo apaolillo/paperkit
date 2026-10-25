@@ -1,0 +1,12 @@
+\section{Introduction}
+
+Springer compiles the sources of an LNCS paper itself, and its checklist asks
+for the compiled bibliography, the \texttt{.bbl} file, next to the
+main file~\cite{llncs}. A page count in LNCS proceedings includes the
+references, so the budget is a cap on the whole PDF. paperkit handles both
+from the configuration file: the archive carries the \texttt{.bbl}, and the
+report flags the PDF when it grows past the cap~\cite{reproducible}.
+
+This example also shows a bibliography with one entry more than the paper
+cites. The entry is kept for the extended version of the paper and is excused
+by key, so the unused-entry check stays on for everything else.

@@ -1,0 +1,52 @@
+# paperkit configuration for the USENIX example: a two-column submission
+# under the usenix profile. Every key is optional; the ones such a paper
+# reaches for are written out, with the reason. The full list, with every
+# default, is docs/configuration.md.
+
+[project]
+main = "paper"
+content_dirs = ["content"]
+bib = "references.bib"
+
+[build]
+engine = "pdflatex"
+passes = 3
+shell_escape = false
+bibtex = true
+output_dir = "out"
+source_date_epoch = "git"
+
+[docker]
+image_name = "paperkit-builder"
+base_image = "ubuntu:26.04"
+extra_packages = []
+
+[checks]
+non_ascii = true
+trailing_whitespace = true
+final_newline = true
+font_embedding = true
+no_type3 = true
+overfull_boxes = true
+unused_bib = true
+# The bibliography stays in the order it was written. bibtex-tidy still
+# holds it to one formatting (braces, alignment, trailing commas) but does
+# not reorder entries or fields; `paperkit bibtidy` follows the same setting.
+bibtex_tidy = { enabled = true, version = "1.14.0", sort = false }
+
+[page_limits]
+# "12 pages, not including references": the budget ends where the
+# references start, and the acknowledgments are inside it. The usenix
+# profile sets ack_counts_as_content; the number is the call's.
+before_refs = 12
+ack_counts_as_content = true
+
+[zip]
+# Submission is a PDF, so this is for the artifact or the authors' archive:
+# the main file, the sections, the bibliography, and any style file in the
+# directory, which is where the call's usenix2019_v3.sty goes.
+name = "paper"
+include = ["{main}.tex", "content/*.tex", "references.bib", "*.sty"]
+
+[profile]
+name = "usenix"

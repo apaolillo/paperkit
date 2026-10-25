@@ -15,3 +15,7 @@ tests/papers/*/*.pdf
 
 tests/papers/*/build.out
 tests/papers/*/*.bib.original
+
+# The script's capture of each example's report; the examples' own
+# .gitignore covers their build output.
+examples/*/build.out

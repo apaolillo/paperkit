@@ -1,0 +1,44 @@
+% The paper. USENIX's style file (usenix2019_v3.sty) is not in TeX Live: a
+% real submission drops it in this directory and loads it with
+% \usepackage{usenix2019_v3}; the base profile's archive pattern "*.sty"
+% then ships it. This example stays buildable without it, as a two-column
+% article with the same page geometry.
+\documentclass[letterpaper,twocolumn,10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+% microtype's character protrusion and font expansion tighten justified text in
+% narrow columns, which is most of what makes a paragraph underfull.
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{url}
+
+\title{\Large\bf A Paper in the USENIX Format}
+\author{
+  {\rm A. Author}\\
+  An Institution
+  \and
+  {\rm B. Author}\\
+  Another Institution
+}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\input{content/00-abstract}
+\end{abstract}
+
+\input{content/10-introduction}
+\input{content/20-approach}
+\input{content/80-conclusion}
+
+% USENIX calls state the limit as "N pages, not including references": the
+% acknowledgments are inside the budget, and the usenix profile counts them.
+\section*{Acknowledgments}
+\input{content/90-acknowledgments}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

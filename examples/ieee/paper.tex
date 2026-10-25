@@ -1,0 +1,43 @@
+% The paper. Its sections live in content/, so this file only names them.
+\documentclass[conference]{IEEEtran}
+
+\usepackage{booktabs}
+\usepackage{url}
+
+\begin{document}
+
+\title{A Paper in the IEEE Format}
+
+\author{\IEEEauthorblockN{A. Author}
+\IEEEauthorblockA{An Institution\\
+A City, A Country\\
+author@example.org}
+\and
+\IEEEauthorblockN{B. Author}
+\IEEEauthorblockA{Another Institution\\
+Another City, Another Country\\
+b.author@example.org}}
+
+\maketitle
+
+\begin{abstract}
+\input{content/00-abstract}
+\end{abstract}
+
+\begin{IEEEkeywords}
+reproducible builds, pre-submission checks, research papers
+\end{IEEEkeywords}
+
+\input{content/10-introduction}
+\input{content/20-approach}
+\input{content/80-conclusion}
+
+% IEEEtran's starred section writes no table-of-contents entry, so paperkit
+% finds this heading in the PDF text instead to measure the pages before it.
+\section*{Acknowledgment}
+\input{content/90-acknowledgment}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

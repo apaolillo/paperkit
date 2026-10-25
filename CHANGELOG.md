@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/`: a complete project per profile, LaTeX and Typst, each with a
+  commented `.paperkit.toml` and a README saying what it shows and what to
+  change for your own paper. Built through the images in CI and held to
+  `--strict`.
 - Typst support: `[build] engine = "typst"` builds `<main>.typ` in an image
   without TeX Live, around a Typst release pinned by version and checksum
   (`[typst] version`, or `build_from_source` for a cargo build). Typst's

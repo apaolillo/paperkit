@@ -1,0 +1,20 @@
+\section{Introduction}
+
+A paper's sources accumulate small defects that nobody notices until a
+submission is desk-rejected or a camera-ready PDF bounces: a Type 3 font
+brought in by a plot, a page over the limit once the acknowledgments are
+counted, a bibliography entry left over from an earlier draft, an overfull
+line pushing into the margin. Each is cheap to fix and expensive to find by
+hand, and the cost falls on the day of the deadline.
+
+\sys builds the paper in a container composed from a configuration file and
+checks the result the way a programme chair would~\cite{reproducible}. This
+example shows the shape of a project that uses it: the paper and its
+supplementary material built from one tree, a shared bibliography checked
+across both, a pinned \TeX\ Live so every rebuild uses the same packages, and
+a submission archive that carries the compiled bibliography TAPS
+needs~\cite{acmart}.
+
+Section~\ref{sec:design} describes the layout and Section~\ref{sec:evaluation}
+reports what the checks say about it. The supplementary material, built as a
+second target, holds the full tables and the steps to reproduce them.

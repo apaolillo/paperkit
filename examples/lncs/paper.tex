@@ -1,0 +1,36 @@
+% The paper. Its sections live in content/, so this file only names them.
+\documentclass[runningheads]{llncs}
+
+\usepackage{booktabs}
+\usepackage{url}
+
+\begin{document}
+
+\title{A Paper in the LNCS Format}
+\titlerunning{A Paper in the LNCS Format}
+\author{A. Author\inst{1} \and B. Author\inst{2}}
+\authorrunning{A. Author and B. Author}
+\institute{An Institution, A City, A Country\\
+\email{author@example.org}
+\and
+Another Institution, Another City, Another Country\\
+\email{b.author@example.org}}
+
+\maketitle
+
+\begin{abstract}
+\input{content/00-abstract}
+\keywords{Reproducible builds \and Pre-submission checks \and Research papers}
+\end{abstract}
+
+\input{content/10-introduction}
+\input{content/20-approach}
+\input{content/80-conclusion}
+
+\subsubsection*{Acknowledgments.}
+\input{content/90-acknowledgments}
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}

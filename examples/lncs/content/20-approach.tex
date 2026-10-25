@@ -1,0 +1,22 @@
+\section{Approach}
+
+The bibliography check reads the citations from the build output, not from
+the sources, so a commented-out \verb|\cite| or a key built with a macro does
+not fool it. Each entry nothing cites is reported with its key, and the
+report says which target it looked at. Table~\ref{tab:entries} lists the
+entries of this paper.
+
+\begin{table}[t]
+  \caption{The bibliography entries of this paper and their state.}
+  \label{tab:entries}
+  \centering
+  \begin{tabular}{lll}
+    \toprule
+    Key & Cited & Reported \\
+    \midrule
+    \texttt{llncs} & yes & no \\
+    \texttt{reproducible} & yes & no \\
+    \texttt{extended} & no & no, excused by key \\
+    \bottomrule
+  \end{tabular}
+\end{table}

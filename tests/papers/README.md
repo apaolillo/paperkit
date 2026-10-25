@@ -35,3 +35,7 @@ the build-related code or these papers change.
 
 The unit suite never builds them, since it must run without TeX; it only
 loads their configuration files. Build output stays out of git.
+
+These are test fixtures, kept small. The projects a new user should look at
+are under `examples/`: one per profile, at the size of a real paper, each
+with a commented configuration and a README, and built by the same script.

@@ -1,0 +1,37 @@
+% The paper. Its sections live in content/, the preamble in header/, so
+% that this file only names the pieces and their order.
+%
+% nonacm: no rights block and no conference footer, which a submission does
+% not have yet. For the camera-ready, drop it and add the \acmConference,
+% \acmDOI and \setcopyright lines TAPS sends you.
+\documentclass[sigconf,nonacm]{acmart}
+
+\input{header/packages}
+\input{header/commands}
+
+\begin{document}
+
+\title{A Paper in the ACM Format}
+\input{header/authors}
+
+\begin{abstract}
+\input{content/00-abstract}
+\end{abstract}
+
+\keywords{Reproducible builds, Pre-submission checks, Research papers}
+
+\maketitle
+
+\input{content/10-introduction}
+\input{content/20-design}
+\input{content/30-evaluation}
+\input{content/80-conclusion}
+
+\begin{acks}
+\input{content/90-acknowledgments}
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{content/references}
+
+\end{document}

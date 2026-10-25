@@ -1,0 +1,38 @@
+\section{Design}
+\label{sec:design}
+
+Figure~\ref{fig:overview} shows the workflow. The sources on the left are what
+git tracks; everything on the right is produced by one \texttt{paperkit build}
+and stays out of version control.
+
+\begin{figure}[t]
+  \centering
+  \input{figures/tex/overview}
+  % acmart requires a \Description for every figure, for screen readers, and
+  % warns about each one that lacks it.
+  \Description{Sources on the left feed paperkit build, which produces the
+  PDF, the report and the text exports; paperkit zip produces the archive.}
+  \caption{One build produces the PDF, the build log, the exported title and
+  abstract, and the report; one \texttt{paperkit zip} produces the archive.
+  Nothing on the right is committed.}
+  \label{fig:overview}
+\end{figure}
+
+\paragraph{Sources in directories}
+The main file \texttt{paper.tex} names the pieces and their order; the text
+lives in \texttt{content/}, numbered so that the directory listing reads like
+the table of contents, and the preamble in \texttt{header/}.
+Figure~\ref{fig:overview} is itself a \TeX\ source, kept with the other
+figures, so it is typeset with the paper's fonts and needs no conversion.
+
+\paragraph{Two targets}
+The supplementary material is a second main file in the same tree. It shares
+\texttt{header/} and the bibliography, so a macro renamed in one place is
+renamed in both, and an entry cited only in the appendix is not reported as
+unused when the paper is checked.
+
+\paragraph{A pinned environment}
+The configuration names a dated \TeX\ Live snapshot and its checksum, so the
+image that builds the paper has the same packages on every rebuild, on every
+machine, and the build timestamp comes from the commit, so two builds of one
+commit produce the same bytes~\cite{reproducible}.

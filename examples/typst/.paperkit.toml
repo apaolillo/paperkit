@@ -1,0 +1,63 @@
+# paperkit configuration for the Typst example: a plain Typst paper under
+# the typst profile. Every key is optional; the ones a Typst paper reaches
+# for are written out, with the reason. The full list, with every default,
+# is docs/configuration.md.
+
+[project]
+main = "paper"            # paper.typ: the engine decides the extension
+content_dirs = ["content"]
+bib = "references.bib"    # BibTeX or Hayagriva (.yml); the checks follow
+
+[build]
+engine = "typst"
+output_dir = "out"
+source_date_epoch = "git" # Typst honors it, so a commit always builds to the same bytes
+# passes, bibtex and biber mean nothing to a Typst build, which is one
+# compile with the bibliography built in; set, they are ignored with a note.
+
+[docker]
+# A Typst image has no TeX Live: the pinned compiler, the check tools and
+# paperkit, about half a gigabyte. It gets its own default tag so that a
+# LaTeX project and a Typst one do not rebuild each other's image.
+image_name = "paperkit-typst-builder"
+base_image = "ubuntu:26.04"
+extra_packages = []       # for instance a font package the paper needs
+
+[typst]
+# The release installed in the image, verified by checksum. Unset, it is
+# the one verified for this paperkit; another version needs its sha256.
+# version = "0.15.1"
+# System fonts stay out of the build: what Typst embeds (Libertinus Serif,
+# New Computer Modern, DejaVu Sans Mono), the directories listed here, and
+# fonts installed in the image are all a build sees, on every machine. A
+# family nobody provides is reported with the file and line that asked.
+ignore_system_fonts = true
+fonts = []                # for instance ["fonts"], searched recursively
+# Universe packages the sources import, fetched when the image is built so
+# that builds need no network. An import not listed here still builds, and
+# the report says so.
+packages = []             # for instance ["@preview/charged-ieee:0.1.4"]
+# pdf_standard = "a-2b"   # for a venue that requires PDF/A
+
+[checks]
+non_ascii = true
+trailing_whitespace = true
+final_newline = true
+font_embedding = true
+no_type3 = true
+unused_bib = true         # from `typst query`, the build's own list of citations
+bibtex_tidy = { enabled = true, version = "1.14.0" }
+# overfull_boxes is a LaTeX notion; Typst has none, and the check says so.
+
+[page_limits]
+# As for LaTeX: the heading paperkit finds is the bibliography's title.
+# before_refs = 12
+
+[zip]
+# A Typst archive is the exact set of files the compilation read, from
+# `typst compile --deps`, plus the font directories; package files stay
+# out. The patterns below are the typst profile's and only add to that.
+name = "paper"
+
+[profile]
+name = "typst"

@@ -1,0 +1,23 @@
+% The workflow figure, as TikZ: typeset with the paper's fonts, versioned as
+% text, and nothing to convert. Sized to the column: the report counts an
+% overfull line, and a figure a few points too wide is one.
+\begin{tikzpicture}[
+    node distance=3mm and 5mm,
+    box/.style={draw, rounded corners=1pt, minimum width=20mm, minimum height=6mm,
+      font=\scriptsize, align=center},
+    arr/.style={-{Stealth[length=2mm]}, thick},
+  ]
+  \node[box] (src) {sources\\paper.tex, content/,\\header/, figures/};
+  \node[box, right=of src] (build) {paperkit build};
+  \node[box, above right=of build] (pdf) {PDF, log};
+  \node[box, right=of build] (report) {report};
+  \node[box, below right=of build] (txt) {title.txt,\\abstract.txt};
+  \node[box, below=of build] (zip) {paperkit zip};
+  \node[box, right=of zip] (archive) {paper-sources.zip};
+  \draw[arr] (src) -- (build);
+  \draw[arr] (build) -- (pdf);
+  \draw[arr] (build) -- (report);
+  \draw[arr] (build) -- (txt);
+  \draw[arr] (src) |- (zip);
+  \draw[arr] (zip) -- (archive);
+\end{tikzpicture}

@@ -1,0 +1,6 @@
+# Everything a build produces. The PDF is copied next to the main file for
+# convenience; the archive is written here by `paperkit zip`.
+/out/
+*.pdf
+*-sources.zip
+*.bib.original

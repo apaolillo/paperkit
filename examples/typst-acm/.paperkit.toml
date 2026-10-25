@@ -1,0 +1,53 @@
+# paperkit configuration for the Typst ACM example: Universe's
+# faithful-acmart template under the typst-acm profile. Every key is
+# optional; the ones such a paper reaches for are written out, with the
+# reason. The full list, with every default, is docs/configuration.md.
+
+[project]
+main = "paper"
+content_dirs = ["content"]
+bib = "references.bib"
+
+[build]
+engine = "typst"
+output_dir = "out"
+source_date_epoch = "git"
+
+[docker]
+image_name = "paperkit-typst-builder"
+base_image = "ubuntu:26.04"
+extra_packages = []
+
+[typst]
+# The package the paper imports, fetched when the image is built. Keep it
+# in step with the #import line.
+packages = ["@preview/faithful-acmart:0.2.0"]
+# The template sets Libertinus Sans and Math and Inconsolata, which Typst
+# does not embed and the package does not ship. They come with the paper
+# under the SIL Open Font License (fonts/OFL.txt), as the template's README
+# asks, and travel in the archive. Searched recursively.
+fonts = ["fonts"]
+ignore_system_fonts = true
+
+[checks]
+non_ascii = true
+trailing_whitespace = true
+final_newline = true
+font_embedding = true
+no_type3 = true
+unused_bib = true
+bibtex_tidy = { enabled = true, version = "1.14.0" }
+
+[page_limits]
+# "N pages, not including references": the acknowledgments are inside the
+# budget. The typst-acm profile sets ack_counts_as_content; the number is
+# the call's.
+before_refs = 12
+ack_counts_as_content = true
+
+[zip]
+# The exact files the compilation read, plus fonts/; the package stays out.
+name = "paper"
+
+[profile]
+name = "typst-acm"

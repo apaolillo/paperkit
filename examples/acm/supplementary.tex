@@ -1,0 +1,27 @@
+% The supplementary material: a second target built from the same tree. It
+% shares the preamble and the bibliography with the paper, so the unused-entry
+% check looks at the citations of both before calling an entry unused.
+\documentclass[sigconf,nonacm]{acmart}
+
+\input{header/packages}
+\input{header/commands}
+
+\begin{document}
+
+\title{A Paper in the ACM Format: Supplementary Material}
+\input{header/authors}
+
+\begin{abstract}
+\input{content/supplementary/00-abstract}
+\end{abstract}
+
+\maketitle
+
+\appendix
+\input{content/supplementary/A-full-results}
+\input{content/supplementary/B-reproducing}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{content/references}
+
+\end{document}

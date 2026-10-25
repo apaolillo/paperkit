@@ -1,0 +1,32 @@
+\section{Evaluation}
+\label{sec:evaluation}
+
+Table~\ref{tab:checks} lists what the report says for this project. Each row
+is a check that paperkit runs after the build, and each one has a reason to
+exist: the fonts row is what ACM's TAPS rejects first, the page row is what
+the chairs count, and the bibliography rows are what reviewers notice.
+
+\begin{table}[t]
+  \caption{The report for this example. A real paper reads the same table
+  after every build.}
+  \label{tab:checks}
+  \begin{tabular}{ll}
+    \toprule
+    Check & Result \\
+    \midrule
+    LaTeX errors and warnings & none \\
+    Overfull and underfull boxes & none \\
+    Fonts & all embedded, no Type 3 \\
+    Non-ASCII, whitespace, newline & clean \\
+    Unused bibliography entries & none \\
+    bibtex-tidy & tidy \\
+    Pages before the references & 1 of 12 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The one check this layout makes interesting is the unused-entry check. The
+bibliography serves both targets, so paperkit gathers the citations of each
+from its build output before deciding that an entry is unused, and an entry
+the appendix cites~\cite{tlnet} is in use even though this paper never cites
+it. The full tables are in the supplementary material.

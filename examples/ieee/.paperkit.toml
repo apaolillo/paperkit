@@ -1,0 +1,55 @@
+# paperkit configuration for the IEEE example: a conference paper in
+# IEEEtran, under the ieee profile. Every key is optional; the ones a paper
+# at an IEEE conference reaches for are written out, with the reason. The
+# full list, with every default, is docs/configuration.md.
+
+[project]
+main = "paper"            # paper.tex; a list builds several targets
+content_dirs = ["content"]
+bib = "references.bib"
+
+[build]
+engine = "pdflatex"
+passes = 3                # enough to settle references and citations
+shell_escape = false      # nothing here calls an external program
+bibtex = true
+output_dir = "out"
+source_date_epoch = "git" # the commit's date, so a commit always builds to the same bytes
+
+[docker]
+# The default image: the base image's TeX Live, every engine and the check
+# tools. Pinning a TeX Live snapshot instead is shown in examples/acm.
+image_name = "paperkit-builder"
+base_image = "ubuntu:26.04"
+extra_packages = []
+
+[checks]
+non_ascii = true
+trailing_whitespace = true
+final_newline = true
+# What PDF eXpress rejects: a font that is not embedded, or a Type 3
+# (bitmap) font, which a plot saved the wrong way brings in. The report
+# names the font so the figure can be regenerated.
+font_embedding = true
+no_type3 = true
+overfull_boxes = true
+unused_bib = true
+bibtex_tidy = { enabled = true, version = "1.14.0" }
+
+[page_limits]
+# IEEE calls usually cap the whole PDF, references included: here six pages
+# plus two paid extra pages. A paper with a different rule sets before_refs
+# instead; the report shows both counts either way.
+total = 8
+
+[zip]
+# What PDF eXpress needs to compile the sources: the .tex files, the
+# bibliography, and the compiled .bbl next to the main file, since it does
+# not run BibTeX. The ieee profile adds IEEEtran.cls and IEEEtran.bst for a
+# project that carries its own copies; nothing is added when they are absent.
+name = "paper"
+include = ["{main}.tex", "content/*.tex", "references.bib", "IEEEtran.cls", "IEEEtran.bst"]
+include_bbl = true
+
+[profile]
+name = "ieee"
