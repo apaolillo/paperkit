@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from paperkit import reproducible
+from paperkit import reproducible, typst
 from paperkit.profiles import get_profile
+from paperkit.typst import TypstConfig
 
 
 @dataclass
@@ -133,6 +134,9 @@ class PaperkitConfig:
     # [texlive]
     texlive: TexliveConfig = field(default_factory=TexliveConfig)
 
+    # [typst]
+    typst: TypstConfig = field(default_factory=TypstConfig)
+
     # [checks]
     checks: ChecksConfig = field(default_factory=ChecksConfig)
 
@@ -148,6 +152,20 @@ class PaperkitConfig:
     # resolved root directory (where .paperkit.toml lives)
     root: Path = field(default_factory=lambda: Path.cwd())
 
+    @property
+    def is_typst(self) -> bool:
+        return self.engine == "typst"
+
+    @property
+    def main_suffix(self) -> str:
+        """The source extension of a main: .typ for Typst, .tex otherwise."""
+        return ".typ" if self.is_typst else ".tex"
+
+    def main_file(self, main: str) -> Path:
+        return self.root / f"{main}{self.main_suffix}"
+
+
+ENGINES = ("pdflatex", "lualatex", "xelatex", "typst")
 
 TEXLIVE_SCHEMES = (
     "basic",
@@ -178,6 +196,43 @@ def _str_list(section: str, key: str, value: object) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
         raise ValueError(f"[{section}] {key}: expected a list of strings")
     return value
+
+
+def parse_typst(raw: dict[str, object]) -> TypstConfig:
+    """Build a TypstConfig from the [typst] table, rejecting bad values early."""
+    tc = TypstConfig()
+    known = set(TypstConfig.__dataclass_fields__)
+    unknown = sorted(set(raw) - known)
+    if unknown:
+        raise ValueError(
+            f"[typst] unknown key(s): {', '.join(unknown)} (expected: {', '.join(sorted(known))})",
+        )
+    if "version" in raw:
+        version = raw["version"]
+        if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+            raise ValueError(f'[typst] version: expected "X.Y.Z", got {version!r}')
+        tc.version = version
+    if "sha256" in raw:
+        digest = raw["sha256"]
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("[typst] sha256: expected 64 hex characters")
+        tc.sha256 = digest
+    for key in ("build_from_source", "ignore_system_fonts"):
+        if key in raw:
+            if not isinstance(raw[key], bool):
+                raise ValueError(f"[typst] {key}: expected true or false")
+            setattr(tc, key, raw[key])
+    for key in ("fonts", "packages", "extra_args"):
+        if key in raw:
+            setattr(tc, key, _str_list("typst", key, raw[key]))
+    for spec in tc.packages:
+        typst.parse_package(spec)
+    for key in ("packages_dir", "pdf_standard"):
+        if key in raw:
+            if not isinstance(raw[key], str) or not raw[key]:
+                raise ValueError(f"[typst] {key}: expected a non-empty string")
+            setattr(tc, key, raw[key])
+    return tc
 
 
 def parse_texlive(raw: dict[str, object]) -> TexliveConfig:
@@ -381,6 +436,10 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     for key in ("engine", "passes", "shell_escape", "bibtex", "biber", "output_dir", "jobs"):
         if key in build:
             setattr(cfg, key, build[key])
+    if cfg.engine not in ENGINES:
+        raise ValueError(
+            f"[build] engine: expected one of {', '.join(ENGINES)}, got {cfg.engine!r}"
+        )
     if "source_date_epoch" in build:
         cfg.source_date_epoch = reproducible.parse_setting(build["source_date_epoch"])
 
@@ -392,6 +451,9 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
 
     # [texlive]
     cfg.texlive = parse_texlive(raw.get("texlive", {}))
+
+    # [typst]
+    cfg.typst = parse_typst(raw.get("typst", {}))
 
     # [checks]
     checks_raw = raw.get("checks", {})

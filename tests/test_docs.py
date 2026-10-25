@@ -19,6 +19,7 @@ from paperkit.config import (
     PageLimitsConfig,
     PaperkitConfig,
     TexliveConfig,
+    TypstConfig,
     UnusedBibConfig,
     ZipConfig,
 )
@@ -30,11 +31,12 @@ pytestmark = pytest.mark.skipif(not DOC.is_file(), reason="docs/ is not in the s
 # root is the resolved project directory, not a config key; profile_name is
 # documented as `name` under [profile]; and the fields holding a nested table
 # are covered by the section test below rather than as keys of their own.
-NOT_KEYS = {"root", "profile_name", "texlive", "checks", "page_limits", "zip"}
+NOT_KEYS = {"root", "profile_name", "texlive", "typst", "checks", "page_limits", "zip"}
 
 CONFIGS = (
     PaperkitConfig,
     TexliveConfig,
+    TypstConfig,
     ChecksConfig,
     UnusedBibConfig,
     BibtexTidyConfig,
@@ -58,6 +60,16 @@ def test_every_config_key_is_documented(config: type) -> None:
 
 def test_every_section_is_documented() -> None:
     text = _documented()
-    sections = ["project", "build", "docker", "texlive", "checks", "page_limits", "zip", "profile"]
+    sections = [
+        "project",
+        "build",
+        "docker",
+        "texlive",
+        "typst",
+        "checks",
+        "page_limits",
+        "zip",
+        "profile",
+    ]
     missing = [s for s in sections if f"## [{s}]" not in text]
     assert not missing, f"sections missing from docs/configuration.md: {', '.join(missing)}"

@@ -34,7 +34,7 @@ check. The main files themselves are always included.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `engine` | string | `"pdflatex"` | `pdflatex`, `lualatex` or `xelatex` |
+| `engine` | string | `"pdflatex"` | `pdflatex`, `lualatex`, `xelatex`, or `typst` (see `[typst]`) |
 | `passes` | integer | `3` | Engine passes per build |
 | `shell_escape` | bool | `true` | Pass `-shell-escape`, which `minted` and `svg` need |
 | `bibtex` | bool | `true` | Run bibtex after the first pass |
@@ -120,6 +120,44 @@ kept, and the listed ones are added to them.
 `paperkit init` pins a snapshot verified for the installed paperkit release,
 and `paperkit texlive-update` moves `snapshot` and `tlpdb_sha512` to the
 newest published one. It is the only command that uses the network.
+
+## [typst]
+
+Only read when `[build] engine = "typst"`. A Typst project builds in an image
+without TeX Live: the pinned Typst binary, the check tools and paperkit.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `version` | `"X.Y.Z"` | the release verified for this paperkit | Typst release installed in the image |
+| `sha256` | 64 hex chars | known for the default version | Checksum of the release tarball for this machine's architecture; required for any other version |
+| `build_from_source` | bool | `false` | `cargo install --locked typst-cli` pinned to the version's tag, instead of the release binary |
+| `fonts` | list | `[]` | Directories of fonts, relative to the root, searched recursively (`--font-path`) |
+| `ignore_system_fonts` | bool | `true` | Do not search the machine's fonts; the embedded fonts and `fonts` are all a build sees |
+| `packages` | list | `[]` | Universe packages as imported, `"@preview/charged-ieee:0.1.4"`, downloaded into the image when it is built |
+| `packages_dir` | string | unset | A local packages tree on the host (namespaces as subdirectories), mounted read-only into the container |
+| `pdf_standard` | string | unset | One of typst's `--pdf-standard` values, such as `a-2b`, for venues that require PDF/A |
+| `extra_args` | list | `[]` | Further `typst compile` arguments, verbatim |
+
+Unknown keys are an error, as for `[texlive]`.
+
+Reproducibility works differently from LaTeX and needs less: Typst honors
+`SOURCE_DATE_EPOCH` and nothing else varies between two compiles of the same
+sources, with two exceptions that these keys close. Fonts: Typst searches the
+machine's fonts by default and substitutes silently when a family is missing,
+so the same sources render differently on another machine; with
+`ignore_system_fonts = true` a build sees only the fonts Typst embeds
+(Libertinus, New Computer Modern, DejaVu Sans Mono) and the project's own
+`fonts` directories, and a missing family is reported as a warning. Packages:
+an import from Typst Universe is fetched over the network the first time it
+is used; listing it under `packages` fetches it when the image is built, so
+builds themselves need no network. A package the sources import without
+declaring it still works, downloaded at build time, and the report says so.
+
+`build_from_source` exists for a version without a release binary. It
+produces the same compiler but not the same bytes, needs a Rust toolchain in
+the image, and takes minutes rather than seconds, so the release binary is the
+default. `passes`, `bibtex`, `biber` and `[zip] include_bbl` mean nothing to a
+Typst build (one pass, bibliography built in) and are ignored with a note.
 
 ## [checks]
 
