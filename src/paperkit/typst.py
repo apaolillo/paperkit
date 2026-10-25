@@ -10,6 +10,7 @@ checksum. Building from source with cargo is available for a version that
 has no release binary, pinned to the same tag.
 """
 
+import platform
 import re
 import shlex
 from dataclasses import dataclass, field
@@ -34,6 +35,43 @@ _PACKAGE_RE = re.compile(
     r"@(?P<namespace>[a-z0-9-]+)/(?P<name>[a-z0-9-]+):(?P<version>\d+\.\d+\.\d+)"
 )
 _BANNER_RE = re.compile(r"^typst (?P<version>\d+\.\d+\.\d+)")
+# A package file as a dependency list names it: under a package root
+# (<root>/<namespace>/<name>/<version>/...), or as the virtual path typst
+# prints in diagnostics (@<namespace>/<name>:<version>/...).
+_DEPS_PACKAGE_RE = re.compile(
+    r"(?:^|/)(?P<namespace>[a-z0-9-]+)/(?P<name>[a-z0-9-]+)/(?P<version>\d+\.\d+\.\d+)/"
+)
+_DEPS_VIRTUAL_RE = re.compile(
+    r"^@(?P<namespace>[a-z0-9-]+)/(?P<name>[a-z0-9-]+):(?P<version>\d+\.\d+\.\d+)/"
+)
+_PACKAGE_ROOT_MARKERS = (PACKAGE_PATH + "/", PACKAGE_CACHE_PATH + "/", "/typst/packages/")
+
+_ARCHES = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}
+
+
+def host_arch() -> str:
+    """The release architecture of this machine, which is what Docker builds for."""
+    machine = platform.machine().lower()
+    try:
+        return _ARCHES[machine]
+    except KeyError:
+        raise ValueError(f"no typst release for this architecture: {machine!r}") from None
+
+
+def packages_from_deps(inputs: list[str]) -> set[str]:
+    """The package specs among a compilation's inputs, from where they were read."""
+    found = set()
+    for raw in inputs:
+        path = raw.replace("\\", "/")
+        m = _DEPS_VIRTUAL_RE.match(path)
+        if m is None:
+            root = next((r for r in _PACKAGE_ROOT_MARKERS if r in path), None)
+            if root is None:
+                continue
+            m = _DEPS_PACKAGE_RE.search(path[path.index(root) + len(root) - 1 :])
+        if m:
+            found.add(f"@{m['namespace']}/{m['name']}:{m['version']}")
+    return found
 
 
 @dataclass
@@ -130,7 +168,11 @@ def predownload_commands(packages: list[str]) -> list[str]:
     """
     if not packages:
         return []
-    stub = "".join(f"#import {shlex.quote(p)}\\n" for p in packages)
+    # A package spec is a string in Typst source; the stub is a single-quoted
+    # shell word, so the double quotes travel as they are.
+    for p in packages:
+        parse_package(p)  # only well-formed specs reach the shell
+    stub = "".join(f'#import "{p}"\\n' for p in packages)
     return [
         f"mkdir -p {PACKAGE_CACHE_PATH} {PACKAGE_PATH}",
         f"printf '{stub}' > /tmp/predownload.typ",

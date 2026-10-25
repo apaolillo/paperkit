@@ -16,8 +16,9 @@ from pathlib import Path
 from pythainer.builders import UbuntuDockerBuilder
 from pythainer.runners import ConcreteDockerRunner
 
-from paperkit import __version__, texlive
+from paperkit import __version__, texlive, typst
 from paperkit.config import PaperkitConfig
+from paperkit.profiles import BaseProfile
 
 # Lines of captured build output shown when a quiet image build fails.
 _FAILURE_TAIL_LINES = 30
@@ -147,6 +148,55 @@ def build_image(config: PaperkitConfig, verbose: bool = False) -> str:
     return config.image_name
 
 
+# Everything paperkit needs beside the compiler; pandoc is for the LaTeX text export.
+_TYPST_TOOL_PACKAGES = [p for p in _TOOL_PACKAGES if p != "pandoc"]
+_TYPST_PREREQS = ["ca-certificates", "curl", "xz-utils", "fontconfig"]
+_RUST_PREREQS = ["build-essential", "pkg-config", "libssl-dev", "git"]
+_IMAGE_FONT_DIRS = ["/usr/share/fonts", "/usr/share/texmf/fonts"]
+
+
+def _typst_layers(
+    builder: UbuntuDockerBuilder, config: PaperkitConfig, profile: BaseProfile
+) -> None:
+    """The image of a Typst project: no TeX Live, a pinned typst, its packages.
+
+    Layers go from the most stable to the most project-specific, so a change
+    to the declared packages does not reinstall the compiler.
+    """
+    tc = config.typst
+    builder.desc("Install tools and profile packages")
+    builder.add_packages(_TYPST_PREREQS + _TYPST_TOOL_PACKAGES + profile.docker_packages())
+    builder.space()
+
+    if tc.build_from_source:
+        builder.desc("Install a Rust toolchain to build typst from source")
+        builder.add_packages(_RUST_PREREQS)
+        builder.run("curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal")
+        builder.env("PATH", "/root/.cargo/bin:${PATH}")
+        builder.space()
+
+    builder.desc(f"Install typst {tc.version}" + (" from source" if tc.build_from_source else ""))
+    builder.run_multiple(typst.install_commands(tc, typst.host_arch()))
+    # Fonts installed into the image (profile and extra packages) are part of
+    # the pinned environment, unlike a host's: make them visible to a build
+    # that otherwise ignores system fonts. Debian puts font packages under
+    # /usr/share/fonts, and the TeX ones (TeX Gyre among them) under texmf.
+    builder.run(f"mkdir -p {' '.join(_IMAGE_FONT_DIRS)}")
+    builder.env("TYPST_FONT_PATHS", ":".join(_IMAGE_FONT_DIRS))
+    builder.space()
+
+    # Declared packages are fetched into the image's cache; the container's
+    # user must be able to write there too, for an import nobody declared.
+    builder.desc("Typst package directories")
+    builder.env("TYPST_PACKAGE_PATH", typst.PACKAGE_PATH)
+    builder.env("TYPST_PACKAGE_CACHE_PATH", typst.PACKAGE_CACHE_PATH)
+    builder.run(f"mkdir -p {typst.PACKAGE_PATH} {typst.PACKAGE_CACHE_PATH}")
+    if tc.packages:
+        builder.run_multiple(typst.predownload_commands(tc.packages))
+    builder.run(f"chmod -R a+rwX {typst.PACKAGE_CACHE_PATH} && chmod -R a+rX {typst.PACKAGE_PATH}")
+    builder.space()
+
+
 def make_builder(config: PaperkitConfig) -> UbuntuDockerBuilder:
     """Assemble the image definition (Dockerfile + build context) for *config*."""
     from paperkit.profiles import get_profile
@@ -167,7 +217,9 @@ def make_builder(config: PaperkitConfig) -> UbuntuDockerBuilder:
     builder.env("DEBIAN_FRONTEND", "noninteractive")
     builder.space()
 
-    if tl.source == "upstream":
+    if config.is_typst:
+        _typst_layers(builder, config, profile)
+    elif tl.source == "upstream":
         # Prerequisites and TeX Live get their own layers ahead of the tools,
         # so the (large) TeX Live layer only rebuilds when [texlive] changes.
         builder.desc("Install prerequisites for upstream TeX Live")
@@ -230,6 +282,23 @@ def make_builder(config: PaperkitConfig) -> UbuntuDockerBuilder:
     return builder
 
 
+def container_volumes(config: PaperkitConfig) -> dict[str, str]:
+    """The project at the working directory, plus a Typst project's local packages.
+
+    The local packages tree is mounted read-only where typst looks for
+    package namespaces, so a template kept outside Universe resolves without
+    being copied into the image.
+    """
+    volumes = {str(config.root): str(CONTAINER_WORKDIR)}
+    if config.is_typst and config.typst.packages_dir:
+        host = Path(config.typst.packages_dir).expanduser().resolve()
+        if host.is_dir():
+            volumes[str(host)] = f"{typst.PACKAGE_PATH}:ro"
+        else:
+            print(f"  warning: [typst] packages_dir {host} is not a directory; not mounted")
+    return volumes
+
+
 def run_in_docker(
     config: PaperkitConfig,
     command: str,
@@ -246,9 +315,7 @@ def run_in_docker(
     runner = ConcreteDockerRunner(
         image=config.image_name,
         name=f"{config.image_name}-run",
-        volumes={
-            str(config.root): str(CONTAINER_WORKDIR),
-        },
+        volumes=container_volumes(config),
         environment_variables=env or {},
         workdir=CONTAINER_WORKDIR,
         tty=True,

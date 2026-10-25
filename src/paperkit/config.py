@@ -454,6 +454,10 @@ def load_config(path: Path | None = None) -> PaperkitConfig:
     for key in ("base_image", "image_name", "extra_packages", "debconf_selections"):
         if key in docker:
             setattr(cfg, key, docker[key])
+    if "image_name" not in docker and cfg.is_typst:
+        # A Typst image has no TeX Live; sharing a tag with LaTeX projects
+        # would make the two kinds of project rebuild each other's image.
+        cfg.image_name = "paperkit-typst-builder"
 
     # [texlive]
     cfg.texlive = parse_texlive(raw.get("texlive", {}))

@@ -5,12 +5,14 @@
 
 import json
 import subprocess
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from pythainer.builders import render_dockerfile_content
 
-from paperkit import bibliography, builder, checks, typst
+from paperkit import archive, bibliography, builder, checks, docker, typst
 from paperkit.builder import BuildResult
 from paperkit.checks import CheckStatus
 from paperkit.config import PaperkitConfig, load_config, parse_typst
@@ -52,7 +54,7 @@ def test_source_build_pins_the_tag_and_needs_no_checksum() -> None:
 def test_packages_are_fetched_by_importing_them() -> None:
     assert typst.predownload_commands([]) == []
     steps = typst.predownload_commands(["@preview/charged-ieee:0.1.4", "@preview/cetz:0.3.4"])
-    assert any("#import @preview/charged-ieee:0.1.4" in s for s in steps)
+    assert any('#import "@preview/charged-ieee:0.1.4"' in s for s in steps)
     assert any("typst compile /tmp/predownload.typ" in s for s in steps)
     assert any(typst.PACKAGE_CACHE_PATH in s for s in steps)
 
@@ -287,6 +289,8 @@ def test_citations_are_queried_from_typst(tmp_path: Path, monkeypatch: pytest.Mo
         calls.append(cmd)
         if cmd[-2:] == ["--field", "key"]:
             return SimpleNamespace(stdout='["<a>", "<a>"]\n', returncode=0)
+        if cmd[-2:] == ["--field", "target"]:
+            return SimpleNamespace(stdout='["<fig:sun>", "<a>"]\n', returncode=0)
         return SimpleNamespace(stdout="[false]\n", returncode=0)
 
     monkeypatch.setattr(subprocess, "run", run)
@@ -294,11 +298,11 @@ def test_citations_are_queried_from_typst(tmp_path: Path, monkeypatch: pytest.Mo
     out.mkdir(parents=True)
     cites = bibliography.write_citations(cfg, "paper", out)
     assert cites == out / "paper.cites"
-    assert json.loads(cites.read_text()) == {"citations": ["a"], "cite_all": False}
+    assert json.loads(cites.read_text()) == {"citations": ["a", "fig:sun"], "cite_all": False}
     assert calls[0][:3] == ["typst", "query", "--root"]
     usage = bibliography.usage_from_dir(cfg, "paper", out, "this run")
     assert usage is not None
-    assert (usage.citations, usage.cite_all) == ({"a"}, False)
+    assert (usage.citations, usage.cite_all) == ({"a", "fig:sun"}, False)
     assert usage.bib_files == {(tmp_path / "refs.bib").resolve()}
     # The whole check, end to end, sees b as unused.
     results = bibliography.project_bib_checks(
@@ -338,3 +342,208 @@ def test_bibtex_tidy_is_skipped_for_hayagriva(tmp_path: Path) -> None:
         CheckStatus.CLEAN,
         ["Skipped (Hayagriva bibliography, not BibTeX)"],
     )
+
+
+# -- the image ----------------------------------------------------------------------------
+
+
+def _dockerfile(cfg: PaperkitConfig) -> str:
+    builder = docker.make_builder(cfg)
+    return render_dockerfile_content(package_manager="apt", commands=builder._build_commands)
+
+
+def test_a_typst_image_has_no_tex_live(tmp_path: Path) -> None:
+    text = _dockerfile(_typst_project(tmp_path))
+    assert "texlive" not in text.lower()
+    assert "pandoc" not in text
+    assert "poppler-utils" in text and "npm" in text
+    assert (
+        f"v{typst.KNOWN_GOOD_VERSION}/typst-{typst.host_arch()}-unknown-linux-musl.tar.xz" in text
+    )
+    assert "sha256sum -c" in text
+    assert "typst --version" in text
+    assert f"ENV TYPST_PACKAGE_PATH={typst.PACKAGE_PATH}" in text
+    assert f"ENV TYPST_PACKAGE_CACHE_PATH={typst.PACKAGE_CACHE_PATH}" in text
+    assert "ENV TYPST_FONT_PATHS=/usr/share/fonts:/usr/share/texmf/fonts" in text
+    assert "rustup" not in text and "cargo" not in text
+    assert "pip install --break-system-packages" in text  # paperkit itself
+
+
+def test_declared_packages_are_fetched_into_the_image(tmp_path: Path) -> None:
+    cfg = _typst_project(tmp_path, packages=["@preview/charged-ieee:0.1.4"])
+    text = _dockerfile(cfg)
+    assert '#import "@preview/charged-ieee:0.1.4"' in text
+    assert "typst compile /tmp/predownload.typ" in text
+    # The compiler layer comes before the packages layer, so a package change
+    # does not reinstall the compiler.
+    assert text.index("sha256sum -c") < text.index("predownload")
+
+
+def test_building_from_source_brings_a_rust_toolchain(tmp_path: Path) -> None:
+    cfg = _typst_project(tmp_path, build_from_source=True, version="0.9.0")
+    text = _dockerfile(cfg)
+    assert "sh.rustup.rs" in text
+    assert (
+        "cargo install --locked --git https://github.com/typst/typst --tag v0.9.0 typst-cli" in text
+    )
+    assert "sha256sum" not in text
+
+
+def test_a_latex_image_is_untouched(tmp_path: Path) -> None:
+    text = _dockerfile(PaperkitConfig(root=tmp_path))
+    assert "typst" not in text.lower()
+    assert "texlive" in text.lower()
+
+
+def test_local_packages_are_mounted_read_only(tmp_path: Path) -> None:
+    pkgs = tmp_path / "pkgs"
+    pkgs.mkdir()
+    cfg = _typst_project(tmp_path, packages_dir=str(pkgs))
+    volumes = docker.container_volumes(cfg)
+    assert volumes[str(tmp_path)] == str(docker.CONTAINER_WORKDIR)
+    assert volumes[str(pkgs.resolve())] == f"{typst.PACKAGE_PATH}:ro"
+
+
+def test_a_missing_packages_dir_is_not_mounted(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _typst_project(tmp_path, packages_dir=str(tmp_path / "nowhere"))
+    volumes = docker.container_volumes(cfg)
+    assert list(volumes) == [str(tmp_path)]
+    assert "not a directory" in capsys.readouterr().out
+
+
+def test_host_arch_maps_to_a_release_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    for machine, arch in (
+        ("x86_64", "x86_64"),
+        ("AMD64", "x86_64"),
+        ("aarch64", "aarch64"),
+        ("arm64", "aarch64"),
+    ):
+        monkeypatch.setattr(typst.platform, "machine", lambda m=machine: m)
+        assert typst.host_arch() == arch
+    monkeypatch.setattr(typst.platform, "machine", lambda: "riscv64")
+    with pytest.raises(ValueError, match="riscv64"):
+        typst.host_arch()
+
+
+def test_packages_are_read_off_the_dependency_paths() -> None:
+    inputs = [
+        "paper.typ",
+        "content/1.0.0/notes.typ",  # a project path that happens to look like a version
+        "/opt/typst/cache/preview/charged-ieee/0.1.4/lib.typ",  # the image's cache
+        "/opt/typst/cache/preview/charged-ieee/0.1.4/template/main.typ",
+        "/opt/typst/packages/spells/deliverable/2.0.0/lib.typ",  # a mounted local namespace
+        "/home/me/.cache/typst/packages/preview/cetz/0.3.4/lib.typ",  # a host cache
+        "@preview/tablex:0.0.9/tablex.typ",  # the virtual form
+    ]
+    assert typst.packages_from_deps(inputs) == {
+        "@preview/charged-ieee:0.1.4",
+        "@spells/deliverable:2.0.0",
+        "@preview/cetz:0.3.4",
+        "@preview/tablex:0.0.9",
+    }
+
+
+def test_undeclared_universe_packages_are_a_warning(tmp_path: Path) -> None:
+    cfg = _typst_project(tmp_path, packages=["@preview/cetz:0.3.4"])
+    deps = tmp_path / "paper.deps"
+    deps.write_text(
+        json.dumps(
+            {
+                "inputs": [
+                    "paper.typ",
+                    "/opt/typst/cache/preview/charged-ieee/0.1.4/lib.typ",
+                    "/opt/typst/cache/preview/cetz/0.3.4/lib.typ",
+                    "/opt/typst/packages/spells/deliverable/2.0.0/lib.typ",  # local
+                ]
+            }
+        )
+    )
+    result = checks.check_typst_packages(cfg, deps)
+    assert result.status == CheckStatus.WARNING
+    assert result.messages[0] == "1 package(s) downloaded at build time, not declared:"
+    assert result.messages[1].strip() == "@preview/charged-ieee:0.1.4"
+    cfg.typst.packages.append("@preview/charged-ieee:0.1.4")
+    result = checks.check_typst_packages(cfg, deps)
+    assert (result.status, result.messages) == (
+        CheckStatus.CLEAN,
+        ["3 package(s), all available in the image"],
+    )
+    deps.write_text(json.dumps({"inputs": ["paper.typ"]}))
+    assert checks.check_typst_packages(cfg, deps).messages == ["No packages used"]
+    assert checks.check_typst_packages(cfg, None).status == CheckStatus.SKIPPED
+
+
+# -- the archive --------------------------------------------------------------------------
+
+
+def _typst_archive_project(tmp_path: Path) -> PaperkitConfig:
+    cfg = _typst_project(tmp_path)
+    cfg.content_dirs = []
+    cfg.zip.name = "paper"
+    cfg.zip.include = ["{main}.typ"]
+    (tmp_path / "used.typ").write_text("x\n")
+    (tmp_path / "unused.typ").write_text("x\n")
+    (tmp_path / "refs.bib").write_text("@misc{a, title={A}}\n")
+    (tmp_path / "fonts").mkdir()
+    (tmp_path / "fonts" / "Times.otf").write_bytes(b"font")
+    cfg.typst.fonts = ["fonts"]
+    return cfg
+
+
+def test_the_archive_is_what_the_build_read_plus_the_fonts(tmp_path: Path) -> None:
+    cfg = _typst_archive_project(tmp_path)
+    out = tmp_path / "out" / "paper"
+    out.mkdir(parents=True)
+    (out / "paper.deps").write_text(
+        json.dumps(
+            {
+                "inputs": [
+                    "paper.typ",
+                    "used.typ",
+                    "refs.bib",
+                    "/opt/typst/cache/preview/cetz/0.3.4/lib.typ",
+                ]
+            }
+        )
+    )
+    result = archive.create_zip(cfg)
+    with zipfile.ZipFile(result.path) as zf:
+        assert sorted(zf.namelist()) == ["fonts/Times.otf", "paper.typ", "refs.bib", "used.typ"]
+    assert result.warnings == []
+
+
+def test_without_a_build_the_patterns_alone_are_archived_with_a_warning(tmp_path: Path) -> None:
+    cfg = _typst_archive_project(tmp_path)
+    result = archive.create_zip(cfg)
+    with zipfile.ZipFile(result.path) as zf:
+        assert sorted(zf.namelist()) == ["fonts/Times.otf", "paper.typ"]
+    assert len(result.warnings) == 1 and "no dependency list" in result.warnings[0]
+
+
+def test_include_bbl_is_ignored_for_typst_with_a_warning(tmp_path: Path) -> None:
+    cfg = _typst_archive_project(tmp_path)
+    cfg.zip.include_bbl = True
+    result = archive.create_zip(cfg)
+    assert any("include_bbl ignored" in w for w in result.warnings)
+
+
+def test_the_ieee_profile_brings_its_fonts_into_the_image(tmp_path: Path) -> None:
+    cfg = _typst_project(tmp_path)
+    cfg.profile_name = "typst-ieee"
+    assert "fonts-texgyre" in _dockerfile(cfg)
+    cfg.profile_name = "typst-acm"
+    assert "fonts-texgyre" not in _dockerfile(cfg)
+
+
+def test_typst_projects_get_their_own_image_tag(tmp_path: Path) -> None:
+    path = tmp_path / ".paperkit.toml"
+    path.write_text('[build]\nengine = "typst"\n[profile]\nname = "typst"\n')
+    assert load_config(path).image_name == "paperkit-typst-builder"
+    path.write_text(
+        '[build]\nengine = "typst"\n[docker]\nimage_name = "mine"\n[profile]\nname = "typst"\n'
+    )
+    assert load_config(path).image_name == "mine"
+    path.write_text("")
+    assert load_config(path).image_name == "paperkit-builder"

@@ -4,6 +4,7 @@
 """Verification checks ported from build.sh."""
 
 import contextlib
+import json
 import re
 import shutil
 import subprocess
@@ -58,6 +59,41 @@ def _collect_source_files(config: PaperkitConfig) -> list[Path]:
 _TYPST_DIAGNOSTIC_RE = re.compile(
     r"^(?:(?P<where>.+?:\d+:\d+): )?(?P<level>error|warning): (?P<msg>.*)$"
 )
+
+
+def check_typst_packages(config: PaperkitConfig, deps_path: Path | None) -> CheckResult:
+    """Universe packages the build used that `[typst] packages` does not declare.
+
+    An undeclared package still builds, downloaded on the spot, which is
+    exactly the network dependency declaring it removes from every later
+    build and from the image.
+    """
+    result = CheckResult(name="Typst packages")
+    if not deps_path or not deps_path.is_file():
+        result.status = CheckStatus.SKIPPED
+        result.messages.append("Skipped (no dependency list from the build)")
+        return result
+    try:
+        inputs = json.loads(deps_path.read_text()).get("inputs", [])
+    except (ValueError, AttributeError):
+        result.status = CheckStatus.SKIPPED
+        result.messages.append(f"Skipped (unreadable {deps_path.name})")
+        return result
+    used = typst.packages_from_deps(inputs)
+    universe = {spec for spec in used if spec.startswith("@preview/")}
+    undeclared = sorted(universe - set(config.typst.packages))
+    if undeclared:
+        result.status = CheckStatus.WARNING
+        result.messages.append(
+            f"{len(undeclared)} package(s) downloaded at build time, not declared:"
+        )
+        result.messages.extend(f"  {spec}" for spec in undeclared)
+        result.messages.append("  declare them under [typst] packages so the image carries them")
+    elif used:
+        result.messages.append(f"{len(used)} package(s), all available in the image")
+    else:
+        result.messages.append("No packages used")
+    return result
 
 
 def check_typst_log(log_path: Path | None) -> CheckResult:
@@ -561,13 +597,13 @@ def check_bibtex_tidy(config: PaperkitConfig) -> CheckResult:
         tidied = tmp_path.read_text()
 
         if original == tidied:
-            result.messages.append("references.bib is tidy")
+            result.messages.append(f"{config.bib} is tidy")
         else:
             orig_lines = original.splitlines()
             tidy_lines = tidied.splitlines()
             diff_lines = sum(1 for a, b in zip(orig_lines, tidy_lines, strict=False) if a != b)
             result.status = CheckStatus.WARNING
-            result.messages.append(f"references.bib is not tidy ({diff_lines} lines differ)")
+            result.messages.append(f"{config.bib} is not tidy ({diff_lines} lines differ)")
             cmd = " ".join(["bibtex-tidy", *tidy_args])
             result.messages.append(f"To fix, run: {cmd} {config.bib}")
 
@@ -599,6 +635,7 @@ def run_all_checks(
         # Typst has no boxes to overflow, so that check does not apply.
         results.append(check_typst_log(build_result.log))
         results.append(check_toolchain(config, build_result.log))
+        results.append(check_typst_packages(config, build_result.deps))
     else:
         # Log checks (always run)
         if build_result.log:
